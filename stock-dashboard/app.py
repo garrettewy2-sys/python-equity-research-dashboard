@@ -189,6 +189,40 @@ st.markdown(
     div[data-baseweb="popover"] li:hover, ul[role="listbox"] li:hover {
         background-color: rgba(59,130,246,0.18) !important;
     }
+ 
+    /* ---------- Dark HTML data tables ---------- */
+    .dtab-wrap {
+        overflow:auto; border:1px solid rgba(255,255,255,0.08);
+        border-radius:14px; box-shadow:0 10px 30px rgba(0,0,0,0.25); background:#0f1b2d;
+    }
+    .dtab { width:100%; border-collapse:collapse; font-size:13px; }
+    .dtab thead th {
+        position:sticky; top:0; z-index:1; background:#0c1626; color:#94a3b8;
+        font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.4px;
+        padding:11px 13px; text-align:right; border-bottom:1px solid rgba(255,255,255,0.1);
+    }
+    .dtab thead th:first-child, .dtab tbody td:first-child { text-align:left; }
+    .dtab tbody td {
+        padding:9px 13px; text-align:right; color:#e5eefc;
+        border-bottom:1px solid rgba(255,255,255,0.05); white-space:nowrap;
+    }
+    .dtab tbody td:first-child { font-weight:700; }
+    .dtab tbody tr:hover td { background: rgba(59,130,246,0.07); }
+ 
+    /* ---------- Company card extras ---------- */
+    .logo-badge {
+        width:54px; height:54px; border-radius:14px; background:rgba(59,130,246,0.15);
+        border:1px solid rgba(96,165,250,0.4); display:flex; align-items:center;
+        justify-content:center; font-weight:900; color:#60a5fa; font-size:16px;
+    }
+    .qstats { display:flex; gap:26px; padding-top:6px; border-top:1px solid rgba(255,255,255,0.07); }
+    .qstats .k { color:#94a3b8; font-size:11.5px; font-weight:600; text-transform:uppercase; letter-spacing:0.4px; }
+    .qstats .v { color:#f8fafc; font-size:19px; font-weight:800; margin-top:3px; }
+ 
+    /* ---------- Prominent thesis ---------- */
+    .thesis-head { font-size:20px; font-weight:900; color:#f8fafc; margin:2px 0 10px 0; }
+    .thesis-head .star { color:#60a5fa; }
+    .thesis-lg { font-size:16px; line-height:1.7; padding:22px 26px; border-left-width:6px; }
     </style>
     """,
     unsafe_allow_html=True,
@@ -628,19 +662,31 @@ def company_card(info):
     name = g(info, "longName") or selected_company
     sector = g(info, "sector") or CATEGORIES.get(selected_company, "")
     industry = g(info, "industry") or ""
-    summary = g(info, "longBusinessSummary") or NOTES[selected_company]
-    if len(summary) > 320:
-        summary = summary[:320].rsplit(" ", 1)[0] + "…"
+ 
+    row = comparison_df[comparison_df["Company"] == selected_company]
+    price, dtxt, ytxt, dcls, ycls = "—", "—", "—", "neutral", "neutral"
+    if not row.empty:
+        rr = row.iloc[0]
+        if pd.notna(rr["Current Price"]):
+            price = f"${rr['Current Price']:,.2f}"
+        d, y = rr["Daily Change %"], rr["1Y Return %"]
+        if pd.notna(d):
+            dtxt, dcls = f"{d:+.2f}%", ("pos" if d >= 0 else "neg")
+        if pd.notna(y):
+            ytxt, ycls = f"{y:+.1f}%", ("pos" if y >= 0 else "neg")
+ 
     st.markdown(
         f"""<div class="panel">
-        <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px;">
-            <div style="width:54px;height:54px;border-radius:14px;background:rgba(59,130,246,0.15);
-                 border:1px solid rgba(96,165,250,0.4);display:flex;align-items:center;justify-content:center;
-                 font-weight:900;color:#60a5fa;font-size:17px;">{ticker[:4]}</div>
-            <div><div style="font-size:19px;font-weight:800;color:#f8fafc;">{name}</div>
-            <div class="small-muted">{sector}{' · ' + industry if industry else ''}</div></div>
+        <div style="display:flex;align-items:center;gap:14px;margin-bottom:16px;">
+            <div class="logo-badge">{ticker[:4]}</div>
+            <div><div style="font-size:20px;font-weight:800;color:#f8fafc;">{name}</div>
+            <div class="small-muted">{sector}{' · ' + industry if industry else ''} · {RISK_LEVELS.get(selected_company, '')} risk</div></div>
         </div>
-        <p class="small-muted">{summary}</p></div>""",
+        <div class="qstats">
+            <div><div class="k">Price</div><div class="v">{price}</div></div>
+            <div><div class="k">1D</div><div class="v {dcls}">{dtxt}</div></div>
+            <div><div class="k">1Y</div><div class="v {ycls}">{ytxt}</div></div>
+        </div></div>""",
         unsafe_allow_html=True,
     )
  
@@ -686,24 +732,48 @@ def terminal_block(data):
     )
  
  
-def styled_comparison(df):
-    disp = df.copy()
-    disp.index = range(1, len(disp) + 1)
- 
-    def color_ret(v):
-        if v is None or pd.isna(v):
-            return f"color: {MUTED}"
-        return f"color: {GREEN}; font-weight:700" if v >= 0 else f"color: {RED}; font-weight:700"
- 
-    styled = (
-        disp.style
-        .format({
-            "Current Price": "${:,.2f}", "Daily Change %": "{:+.2f}%", "1Y Return %": "{:+.2f}%",
-            "52W High": "${:,.2f}", "52W Low": "${:,.2f}",
-        }, na_rep="—")
-        .map(color_ret, subset=["Daily Change %", "1Y Return %"])
+def dark_table(headers, rows_html, max_height=560):
+    head = "".join(f"<th>{h}</th>" for h in headers)
+    st.markdown(
+        f'<div class="dtab-wrap" style="max-height:{max_height}px;">'
+        f'<table class="dtab"><thead><tr>{head}</tr></thead>'
+        f"<tbody>{rows_html}</tbody></table></div>",
+        unsafe_allow_html=True,
     )
-    st.dataframe(styled, use_container_width=True, height=560)
+ 
+ 
+def styled_comparison(df):
+    rows = ""
+    for _, r in df.iterrows():
+        price = f"${r['Current Price']:,.2f}" if pd.notna(r["Current Price"]) else "—"
+        d, y = r["Daily Change %"], r["1Y Return %"]
+        dcls = "pos" if (pd.notna(d) and d >= 0) else "neg"
+        ycls = "pos" if (pd.notna(y) and y >= 0) else "neg"
+        dtxt = f"{d:+.2f}%" if pd.notna(d) else "—"
+        ytxt = f"{y:+.2f}%" if pd.notna(y) else "—"
+        hi = f"${r['52W High']:,.2f}" if pd.notna(r["52W High"]) else "—"
+        lo = f"${r['52W Low']:,.2f}" if pd.notna(r["52W Low"]) else "—"
+        rows += (
+            f"<tr><td>{r['Company']}</td><td>{r['Ticker']}</td><td>{price}</td>"
+            f"<td class='{dcls}'>{dtxt}</td><td class='{ycls}'>{ytxt}</td>"
+            f"<td>{hi}</td><td>{lo}</td><td>{r['Category']}</td><td>{r['Risk Level']}</td></tr>"
+        )
+    dark_table(
+        ["Company", "Ticker", "Price", "1D %", "1Y %", "52W High", "52W Low", "Category", "Risk"],
+        rows, max_height=560,
+    )
+ 
+ 
+def history_table(data, limit=150):
+    tbl = data[["Date", "Open", "High", "Low", "Close", "Volume"]].sort_values("Date", ascending=False).head(limit)
+    rows = ""
+    for _, r in tbl.iterrows():
+        dt = pd.to_datetime(r["Date"]).strftime("%Y-%m-%d")
+        rows += (
+            f"<tr><td>{dt}</td><td>${r['Open']:,.2f}</td><td>${r['High']:,.2f}</td>"
+            f"<td>${r['Low']:,.2f}</td><td>${r['Close']:,.2f}</td><td>{r['Volume']:,.0f}</td></tr>"
+        )
+    dark_table(["Date", "Open", "High", "Low", "Close", "Volume"], rows, max_height=380)
  
  
 # =============================================================
@@ -751,18 +821,25 @@ if page == "Overview":
 elif page == "Company Analysis":
     page_head(f"Company Analysis — {selected_company}", CATEGORIES.get(selected_company, ""))
     info = get_fundamentals(ticker)
+ 
+    # ---- Investment thesis FIRST (lead with the original research) ----
+    st.markdown(
+        f"<div class='thesis-head'><span class='star'>★</span> Investment Thesis — {selected_company}</div>",
+        unsafe_allow_html=True,
+    )
+    st.markdown(f"<div class='thesis-box thesis-lg'>{NOTES[selected_company]}</div>", unsafe_allow_html=True)
+    st.markdown("<div style='height:18px;'></div>", unsafe_allow_html=True)
+ 
+    # ---- Snapshot + key metrics ----
     a, b = st.columns([1.15, 1])
     with a:
         company_card(info)
     with b:
         stat_grid("Key Metrics", fundamentals_pairs(info))
+ 
     st.markdown("<div style='height:6px;'></div>", unsafe_allow_html=True)
     with st.container(border=True):
         price_chart(height=420, key="period_company")
-    st.markdown("<div style='height:10px;'></div>", unsafe_allow_html=True)
-    st.markdown(f"<div style='font-size:17px;font-weight:800;color:#f8fafc;margin-bottom:6px;'>"
-                f"Investment Thesis</div>", unsafe_allow_html=True)
-    st.markdown(f"<div class='thesis-box'>{NOTES[selected_company]}</div>", unsafe_allow_html=True)
  
 elif page == "Financials":
     page_head(f"Financials — {selected_company}", "Revenue, net income, and operating cash flow")
@@ -773,10 +850,11 @@ elif page == "Financials":
         data = data.reset_index()
         st.markdown("<div style='font-size:17px;font-weight:800;color:#f8fafc;margin:6px 0;'>"
                     "Recent Price History</div>", unsafe_allow_html=True)
-        tbl = data[["Date", "Open", "High", "Low", "Close", "Volume"]].sort_values("Date", ascending=False)
-        st.dataframe(tbl, use_container_width=True, height=340)
+        history_table(data, limit=150)
+        st.markdown("<div style='height:8px;'></div>", unsafe_allow_html=True)
+        full = data[["Date", "Open", "High", "Low", "Close", "Volume"]].sort_values("Date", ascending=False)
         st.download_button("⬇ Download price history (CSV)",
-                           tbl.to_csv(index=False).encode("utf-8"),
+                           full.to_csv(index=False).encode("utf-8"),
                            file_name=f"{ticker}_history.csv", mime="text/csv")
  
 elif page == "Valuation":
