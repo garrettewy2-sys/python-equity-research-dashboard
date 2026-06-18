@@ -131,18 +131,44 @@ st.markdown(
     [data-testid="stSidebar"] .sb-brand .s { font-size:12px; color:#94a3b8; margin-top:2px; }
     [data-testid="stSidebar"] label { color:#e5eefc !important; font-weight:600; }
  
-    /* Sidebar radio -> nav menu */
-    [data-testid="stSidebar"] div[role="radiogroup"] { gap:4px; }
+    /* Sidebar radio -> nav menu (made to look like real clickable buttons) */
+    [data-testid="stSidebar"] div[role="radiogroup"] { gap:6px; }
     [data-testid="stSidebar"] div[role="radiogroup"] label {
-        background: transparent; border:1px solid transparent; border-radius:10px;
-        padding:8px 12px; margin:0; cursor:pointer; transition: all .12s ease; width:100%;
+        display:flex !important; align-items:center; width:100%;
+        background:#0c1626; border:1px solid rgba(255,255,255,0.09); border-radius:10px;
+        padding:9px 12px; margin:0; cursor:pointer; transition: all .12s ease;
+        font-weight:600; color:#cbd5e1;
     }
-    [data-testid="stSidebar"] div[role="radiogroup"] label:hover { background: rgba(255,255,255,0.04); }
-    [data-testid="stSidebar"] div[role="radiogroup"] label[data-checked="true"],
+    [data-testid="stSidebar"] div[role="radiogroup"] label:hover {
+        background: rgba(59,130,246,0.10); border-color: rgba(96,165,250,0.45); transform: translateX(2px);
+    }
+    /* chevron on the right of every item -> signals "go to page" */
+    [data-testid="stSidebar"] div[role="radiogroup"] label::after {
+        content: "\\203A"; margin-left:auto; color:#60a5fa; font-size:18px; font-weight:800; opacity:0.5;
+    }
     [data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
-        background: rgba(59,130,246,0.15); border-color: rgba(59,130,246,0.45);
+        background: rgba(59,130,246,0.18); border-color: rgba(59,130,246,0.6);
+        border-left:3px solid #3b82f6; color:#ffffff; box-shadow:0 5px 16px rgba(59,130,246,0.25);
     }
+    [data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked)::after { opacity:1; }
     [data-testid="stSidebar"] div[role="radiogroup"] label > div:first-child { display:none; }  /* hide radio dot */
+ 
+    /* Nav heading + caption */
+    [data-testid="stSidebar"] .nav-title {
+        font-size:12px; font-weight:800; letter-spacing:1.1px; color:#94a3b8;
+        text-transform:uppercase; margin:2px 0 2px 2px; display:flex; align-items:center; gap:7px;
+    }
+    [data-testid="stSidebar"] .nav-title .dot { color:#60a5fa; font-size:14px; }
+    [data-testid="stSidebar"] .nav-cap { font-size:11.5px; color:#64748b; margin:0 0 9px 2px; }
+ 
+    /* Main-area hint that points to the menu */
+    .nav-hint {
+        font-size:13px; color:#94a3b8; background:rgba(59,130,246,0.08);
+        border:1px solid rgba(59,130,246,0.22); border-left:3px solid #3b82f6;
+        border-radius:10px; padding:9px 14px; margin:0 0 18px 0;
+    }
+    .nav-hint .ic { color:#60a5fa; font-weight:800; margin-right:7px; }
+    .nav-hint b { color:#cbd5e1; }
  
     /* ---------- Buttons ---------- */
     .stButton button, .stDownloadButton button {
@@ -493,6 +519,11 @@ PAGES = [
     "🏠  Overview", "📊  Company Analysis", "📈  Financials", "💲  Valuation",
     "⭐  Watchlist", "📓  Notebook", "⚙️  Settings",
 ]
+st.sidebar.markdown(
+    f"<div class='nav-title'><span class='dot'>●</span> Menu</div>"
+    f"<div class='nav-cap'>{len(PAGES)} sections · tap one to explore ↓</div>",
+    unsafe_allow_html=True,
+)
 nav = st.sidebar.radio("Navigation", PAGES, label_visibility="collapsed")
  
 st.sidebar.divider()
@@ -814,6 +845,12 @@ st.markdown(
         <div class="th-sub">by Garrett Ewy</div>
     </div>
     """,
+    unsafe_allow_html=True,
+)
+ 
+st.markdown(
+    f"<div class='nav-hint'><span class='ic'>◀</span> This is a <b>{len(PAGES)}-section dashboard</b> — "
+    "use the <b>Menu</b> on the left to explore Company Analysis, Financials, Valuation, Watchlist and more.</div>",
     unsafe_allow_html=True,
 )
  
