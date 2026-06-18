@@ -29,33 +29,49 @@ st.markdown(
     }
 
     div[data-testid="stMetric"] {
-        background-color: #f8f9fa;
-        border: 1px solid #e5e7eb;
-        padding: 15px;
-        border-radius: 12px;
-    }
+    background-color: #f8f9fa;
+    color: #111827 !important;
+    border: 1px solid #e5e7eb;
+    padding: 15px;
+    border-radius: 12px;
+}
+
+div[data-testid="stMetric"] * {
+    color: #111827 !important;
+}
+
+div[data-testid="stMetricLabel"] p {
+    color: #4b5563 !important;
+}
 
     .dashboard-card {
-        background-color: #f8f9fa;
-        padding: 18px;
-        border-radius: 14px;
-        border: 1px solid #e5e7eb;
-        margin-bottom: 15px;
-    }
+    background-color: #f8f9fa;
+    color: #111827;
+    padding: 18px;
+    border-radius: 14px;
+    border: 1px solid #e5e7eb;
+    margin-bottom: 15px;
+}
 
-    .small-muted {
-        color: #6b7280;
-        font-size: 15px;
-    }
+.dashboard-card h4 {
+    color: #111827;
+}
 
-    .thesis-box {
-        background-color: #f8f9fa;
-        padding: 20px;
-        border-radius: 14px;
-        border-left: 5px solid #2563eb;
-        font-size: 16px;
-        line-height: 1.6;
-    }
+.small-muted {
+    color: #4b5563;
+    font-size: 15px;
+}
+
+.thesis-box {
+    background-color: #f8f9fa;
+    color: #111827;
+    padding: 16px;
+    border-radius: 14px;
+    border-left: 5px solid #2563eb;
+    font-size: 16px;
+    line-height: 1.5;
+    margin-bottom: 8px;
+}
     </style>
     """,
     unsafe_allow_html=True
