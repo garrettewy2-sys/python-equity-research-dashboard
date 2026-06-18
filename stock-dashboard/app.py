@@ -144,7 +144,7 @@ st.markdown(
     }
     /* chevron on the right of every item -> signals "go to page" */
     [data-testid="stSidebar"] div[role="radiogroup"] label::after {
-        content: "\\203A"; margin-left:auto; color:#60a5fa; font-size:18px; font-weight:800; opacity:0.5;
+        content: "\\203A"; margin-left:auto; color:#ffffff; font-size:18px; font-weight:800; opacity:0.85;
     }
     [data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
         background: rgba(59,130,246,0.18); border-color: rgba(59,130,246,0.6);
@@ -1004,3 +1004,4 @@ st.caption(
     "Created by Garrett Ewy. Built for educational equity research purposes using Python, Streamlit, "
     "yfinance, Pandas, and Plotly. This is not financial advice."
 )
+ 
