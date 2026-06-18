@@ -225,47 +225,27 @@ st.markdown(
     .thesis-head .star { color:#60a5fa; }
     .thesis-lg { font-size:16px; line-height:1.7; padding:22px 26px; border-left-width:6px; }
  
-    /* ---------- Keep sidebar open & visible on every device ---------- */
-    section[data-testid="stSidebar"] {
-        transform: none !important;
-        visibility: visible !important;
-        margin-left: 0 !important;
-    }
-    /* Remove the controls that let the sidebar collapse/hide */
-    [data-testid="collapsedControl"],
-    [data-testid="stSidebarCollapsedControl"],
-    [data-testid="stSidebarCollapseButton"],
-    [data-testid="stSidebarBackdrop"] { display: none !important; }
- 
-    /* ---------- Mobile: sidebar stays open AND beside the content (no overlay) ---------- */
+    /* ---------- Mobile layout ---------- */
     @media (max-width: 640px) {
-        /* Pin sidebar to the left at a compact width */
-        section[data-testid="stSidebar"] {
-            position: fixed !important;
-            top: 0; left: 0; bottom: 0;
-            width: 43vw !important; min-width: 43vw !important; max-width: 43vw !important;
-            z-index: 1000;
+        /* Smaller sidebar so the right side fits; still starts open and is closeable */
+        section[data-testid="stSidebar"],
+        section[data-testid="stSidebar"] > div:first-child,
+        [data-testid="stSidebarContent"] {
+            width: 13.5rem !important; min-width: 13.5rem !important;
         }
-        section[data-testid="stSidebar"] > div,
-        [data-testid="stSidebarContent"], [data-testid="stSidebarUserContent"] {
-            width: 43vw !important; min-width: 43vw !important;
-        }
-        /* Reserve room so the main content sits to the right and is never covered */
-        [data-testid="stMain"], section.main { margin-left: 43vw !important; }
- 
-        /* Compact sidebar so the narrow column stays usable */
+        /* Compact nav + brand so labels fit the narrower sidebar */
         [data-testid="stSidebar"] .sb-brand { padding: 10px 11px; }
         [data-testid="stSidebar"] .sb-brand .t { font-size: 13px; }
         [data-testid="stSidebar"] div[role="radiogroup"] label { padding: 7px 9px; font-size: 13px; }
  
-        .block-container { padding: 1.2rem 0.8rem 2rem 0.8rem; }
+        .block-container { padding: 1.2rem 0.9rem 2rem 0.9rem; }
         /* Stack headers so title and subtitle never touch */
         .page-head { flex-direction: column; align-items: flex-start; gap: 4px; margin-bottom: 14px; }
         .page-head .title { font-size: 22px; }
         .page-head .sub { font-size: 12.5px; }
         .top-head { flex-direction: column; align-items: flex-start; gap: 2px; }
         .top-head .th-title { font-size: 22px; }
-        /* Denser grids for the narrow content column */
+        /* Denser grids for the narrower screen */
         .stat-grid { grid-template-columns: repeat(2, 1fr); }
         .qstats { gap: 16px; }
     }
