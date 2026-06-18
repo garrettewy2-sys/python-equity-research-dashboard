@@ -155,6 +155,40 @@ st.markdown(
  
     [data-testid="stDataFrame"] { border:1px solid rgba(255,255,255,0.08); border-radius:14px; overflow:hidden; }
     hr { border-color: rgba(255,255,255,0.08); }
+ 
+    /* ---------- Top brand header (main panel) ---------- */
+    .top-head {
+        display:flex; align-items:baseline; gap:14px; flex-wrap:wrap;
+        padding:0 0 14px 0; margin-bottom:16px;
+        border-bottom:1px solid rgba(255,255,255,0.08);
+    }
+    .top-head .th-title { font-size:30px; font-weight:900; color:#f8fafc; letter-spacing:-0.6px; }
+    .top-head .th-title .accent { color:#60a5fa; text-shadow:0 0 22px rgba(96,165,250,0.45); }
+    .top-head .th-sub { font-size:15px; font-weight:600; color:#94a3b8; }
+ 
+    /* ---------- Dark form inputs (fix white selectboxes) ---------- */
+    div[data-baseweb="select"] > div,
+    div[data-baseweb="input"] > div,
+    .stSelectbox div[data-baseweb="select"] > div,
+    .stTextInput div[data-baseweb="input"] > div {
+        background-color:#0c1626 !important;
+        border:1px solid rgba(255,255,255,0.12) !important;
+        color:#e5eefc !important;
+        border-radius:10px !important;
+    }
+    div[data-baseweb="select"] *, div[data-baseweb="input"] input {
+        color:#e5eefc !important;
+    }
+    div[data-baseweb="select"] svg { fill:#94a3b8 !important; color:#94a3b8 !important; }
+    /* Dropdown menu popover */
+    div[data-baseweb="popover"] ul,
+    div[data-baseweb="menu"], ul[role="listbox"] {
+        background-color:#0f1b2d !important; border:1px solid rgba(255,255,255,0.1) !important;
+    }
+    div[data-baseweb="popover"] li, ul[role="listbox"] li { color:#e5eefc !important; }
+    div[data-baseweb="popover"] li:hover, ul[role="listbox"] li:hover {
+        background-color: rgba(59,130,246,0.18) !important;
+    }
     </style>
     """,
     unsafe_allow_html=True,
@@ -397,7 +431,7 @@ st.sidebar.markdown(
  
 PAGES = [
     "🏠  Overview", "📊  Company Analysis", "📈  Financials", "💲  Valuation",
-    "⭐  Watchlist", "🧮  Screener", "📓  Notebook", "⚙️  Settings",
+    "⭐  Watchlist", "📓  Notebook", "⚙️  Settings",
 ]
 nav = st.sidebar.radio("Navigation", PAGES, label_visibility="collapsed")
  
@@ -448,6 +482,7 @@ def summary_cards():
         sp_cls, sp_arrow, sp_spark = "neutral", "", ""
  
     gname, gval = top_mover(comparison_df, "Daily Change %")
+    yname, yval = top_mover(comparison_df, "1Y Return %")
  
     c1, c2, c3, c4 = st.columns(4)
     with c1:
@@ -482,12 +517,22 @@ def summary_cards():
                 unsafe_allow_html=True,
             )
     with c4:
-        st.markdown(
-            f"""<div class="sum-card"><div class="label">Universe</div>
-            <div class="row"><div class="value">{len(COMPANIES)}</div></div>
-            <div class="sub neutral">companies · 8+ sectors</div></div>""",
-            unsafe_allow_html=True,
-        )
+        if yname is not None:
+            ycls = "pos" if yval >= 0 else "neg"
+            yarrow = "▲" if yval >= 0 else "▼"
+            st.markdown(
+                f"""<div class="sum-card"><div class="label">Best Performer · 1Y</div>
+                <div class="row"><div class="value sm">{yname}</div></div>
+                <div class="sub {ycls}">{yarrow} {yval:+.1f}%</div></div>""",
+                unsafe_allow_html=True,
+            )
+        else:
+            st.markdown(
+                """<div class="sum-card"><div class="label">Best Performer · 1Y</div>
+                <div class="row"><div class="value sm">—</div></div>
+                <div class="sub neutral">Data unavailable</div></div>""",
+                unsafe_allow_html=True,
+            )
  
  
 def price_chart(height=430, key="period_main"):
@@ -656,7 +701,7 @@ def styled_comparison(df):
             "Current Price": "${:,.2f}", "Daily Change %": "{:+.2f}%", "1Y Return %": "{:+.2f}%",
             "52W High": "${:,.2f}", "52W Low": "${:,.2f}",
         }, na_rep="—")
-        .applymap(color_ret, subset=["Daily Change %", "1Y Return %"])
+        .map(color_ret, subset=["Daily Change %", "1Y Return %"])
     )
     st.dataframe(styled, use_container_width=True, height=560)
  
@@ -665,6 +710,16 @@ def styled_comparison(df):
 # ROUTING
 # =============================================================
 page = nav.split("  ", 1)[-1]
+ 
+st.markdown(
+    """
+    <div class="top-head">
+        <div class="th-title">📈 <span class="accent">Equity Research</span> Dashboard</div>
+        <div class="th-sub">by Garrett Ewy</div>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
  
 if page == "Overview":
     page_head("Overview", "Live market snapshot across your 20-stock research universe")
@@ -770,22 +825,8 @@ elif page == "Watchlist":
     st.markdown("<div style='height:14px;'></div>", unsafe_allow_html=True)
     page_head("Full Universe", "")
     styled_comparison(comparison_df)
- 
-elif page == "Screener":
-    page_head("Screener", "Compare all 20 companies across price, momentum, and risk")
-    cats = ["All"] + sorted(set(CATEGORIES.values()))
-    risks = ["All"] + ["Lower", "Medium", "High", "Very High"]
-    f1, f2 = st.columns(2)
-    cat = f1.selectbox("Filter by category", cats)
-    rk = f2.selectbox("Filter by risk level", risks)
-    view = comparison_df.copy()
-    if cat != "All":
-        view = view[view["Category"] == cat]
-    if rk != "All":
-        view = view[view["Risk Level"] == rk]
-    styled_comparison(view)
-    st.download_button("⬇ Download screen (CSV)", view.to_csv(index=False).encode("utf-8"),
-                       file_name="equity_screen.csv", mime="text/csv")
+    st.download_button("⬇ Download universe (CSV)", comparison_df.to_csv(index=False).encode("utf-8"),
+                       file_name="equity_universe.csv", mime="text/csv")
  
 elif page == "Notebook":
     page_head("Research Notebook", "Investment theses across the universe")
