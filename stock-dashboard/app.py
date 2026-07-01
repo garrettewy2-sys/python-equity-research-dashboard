@@ -527,16 +527,6 @@ st.sidebar.markdown(
 nav = st.sidebar.radio("Navigation", PAGES, label_visibility="collapsed")
  
 st.sidebar.divider()
-st.sidebar.markdown("**Controls**")
-selected_company = st.sidebar.selectbox("Company", list(COMPANIES.keys()))
-ticker = COMPANIES[selected_company]
-interval = st.sidebar.selectbox("Candle interval", ["1d", "1wk", "1mo"], index=0)
-st.sidebar.markdown(f"<span class='small-muted'>Ticker:</span> **{ticker}**", unsafe_allow_html=True)
- 
-if selected_company in SLEEPER_STOCKS:
-    st.sidebar.warning("Sleeper watchlist stock: higher risk / higher potential upside.")
- 
-st.sidebar.divider()
 st.sidebar.caption("Data via yfinance · Educational use only · Not financial advice.")
  
 # ---- Shared data ----
@@ -853,6 +843,48 @@ st.markdown(
     "use the <b>Menu</b> on the left to explore Company Analysis, Financials, Valuation, Watchlist and more.</div>",
     unsafe_allow_html=True,
 )
+
+# =============================================================
+# MAIN PAGE CONTROLS
+# =============================================================
+with st.container(border=True):
+    st.markdown(
+        "<div style='font-size:17px;font-weight:800;color:#f8fafc;margin-bottom:10px;'>Dashboard Controls</div>",
+        unsafe_allow_html=True,
+    )
+
+    control_1, control_2, control_3 = st.columns([2.2, 1, 1.2])
+
+    with control_1:
+        selected_company = st.selectbox(
+            "Company / Ticker",
+            list(COMPANIES.keys()),
+            format_func=lambda company: f"{company} ({COMPANIES[company]})",
+            key="main_company_select",
+        )
+
+    ticker = COMPANIES[selected_company]
+
+    with control_2:
+        st.text_input(
+            "Ticker",
+            value=ticker,
+            disabled=True,
+            key="main_ticker_display",
+        )
+
+    with control_3:
+        interval = st.selectbox(
+            "Candle interval",
+            ["1d", "1wk", "1mo"],
+            index=0,
+            key="main_interval_select",
+        )
+
+if selected_company in SLEEPER_STOCKS:
+    st.warning("High-upside watchlist stock: higher risk / higher potential upside.")
+
+st.markdown("<div style='height:14px;'></div>", unsafe_allow_html=True)
  
 if page == "Overview":
     page_head("Overview", "Live market snapshot across your 20-stock research universe")
