@@ -7,7 +7,9 @@ from dashboard_utils import (
     dividend_yield_percent,
     equal_weight_index,
     format_price,
+    risk_statistics,
     statement_value,
+    valuation_share_count,
 )
 
 
@@ -56,6 +58,30 @@ class DashboardUtilsTests(unittest.TestCase):
     def test_format_price_is_consistent(self):
         self.assertEqual(format_price(345), "$345.00")
         self.assertEqual(format_price(None), "—")
+
+    def test_valuation_share_count_prefers_aggregate_implied_shares(self):
+        info = {
+            "sharesOutstanding": 5.8e9,
+            "impliedSharesOutstanding": 12.2e9,
+            "marketCap": 2.0e12,
+            "currentPrice": 200,
+        }
+        self.assertEqual(valuation_share_count(info), 12.2e9)
+
+    def test_valuation_share_count_falls_back_to_market_cap_over_price(self):
+        self.assertEqual(
+            valuation_share_count({"marketCap": 1_000, "currentPrice": 20}),
+            50,
+        )
+
+    def test_risk_statistics_reports_drawdown_and_returns(self):
+        dates = pd.bdate_range("2023-01-02", periods=800)
+        prices = pd.Series([100 + i * 0.1 for i in range(800)], index=dates)
+        prices.iloc[400] = 80
+        stats = risk_statistics(prices)
+        self.assertLess(stats["maximum_drawdown"], 0)
+        self.assertIsNotNone(stats["return_1y"])
+        self.assertIsNotNone(stats["return_3y"])
 
 
 if __name__ == "__main__":

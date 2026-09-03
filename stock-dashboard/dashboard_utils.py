@@ -97,3 +97,64 @@ def statement_value(statement, row_names, period):
 def format_price(value) -> str:
     value = numeric(value)
     return f"${value:,.2f}" if value is not None else "—"
+
+
+def valuation_share_count(info: Mapping) -> float | None:
+    """Return the best aggregate share count available for per-share valuation.
+
+    Yahoo's ``sharesOutstanding`` can describe only one listed share class. Its
+    ``impliedSharesOutstanding`` field is therefore preferred when it is valid;
+    market capitalization divided by price is the next-best aggregate check.
+    """
+    implied = numeric(info.get("impliedSharesOutstanding"))
+    if implied is not None and implied > 0:
+        return implied
+
+    market_cap = numeric(info.get("marketCap"))
+    price = numeric(info.get("currentPrice", info.get("regularMarketPrice")))
+    if market_cap is not None and market_cap > 0 and price is not None and price > 0:
+        return market_cap / price
+
+    reported = numeric(info.get("sharesOutstanding"))
+    return reported if reported is not None and reported > 0 else None
+
+
+def risk_statistics(close: pd.Series, annual_risk_free_rate: float = 0.0) -> dict:
+    """Calculate transparent daily-return risk and performance statistics."""
+    prices = pd.to_numeric(close, errors="coerce").dropna()
+    if len(prices) < 2:
+        return {
+            "annualized_volatility": None,
+            "downside_volatility": None,
+            "maximum_drawdown": None,
+            "sharpe_ratio": None,
+            "return_1y": None,
+            "return_3y": None,
+        }
+
+    returns = prices.pct_change(fill_method=None).dropna()
+    annualized_volatility = returns.std() * (252 ** 0.5) if len(returns) > 1 else None
+    downside = returns[returns < 0]
+    downside_volatility = downside.std() * (252 ** 0.5) if len(downside) > 1 else None
+    drawdown = prices / prices.cummax() - 1.0
+    maximum_drawdown = float(drawdown.min())
+    sharpe_ratio = None
+    if annualized_volatility and annualized_volatility > 0:
+        sharpe_ratio = (returns.mean() * 252 - annual_risk_free_rate) / annualized_volatility
+
+    def trailing_return(days: int) -> float | None:
+        if len(prices) < 2:
+            return None
+        window = prices.iloc[-min(len(prices), days + 1):]
+        if len(window) < min(days, 20) or window.iloc[0] == 0:
+            return None
+        return float(window.iloc[-1] / window.iloc[0] - 1.0)
+
+    return {
+        "annualized_volatility": float(annualized_volatility) if annualized_volatility is not None else None,
+        "downside_volatility": float(downside_volatility) if downside_volatility is not None else None,
+        "maximum_drawdown": maximum_drawdown,
+        "sharpe_ratio": float(sharpe_ratio) if sharpe_ratio is not None else None,
+        "return_1y": trailing_return(252),
+        "return_3y": trailing_return(756),
+    }

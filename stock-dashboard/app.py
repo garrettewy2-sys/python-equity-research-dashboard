@@ -20,7 +20,9 @@ from dashboard_utils import (
     dividend_yield_percent,
     equal_weight_index,
     format_price,
+    risk_statistics,
     statement_value,
+    valuation_share_count,
 )
 
 
@@ -30,7 +32,7 @@ logger = logging.getLogger(__name__)
 # PAGE SETUP
 # =============================================================
 st.set_page_config(
-    page_title="Equity Intelligence | Research Platform",
+    page_title="Equity Research Dashboard",
     page_icon="📈",
     layout="wide",
     initial_sidebar_state="auto",
@@ -441,21 +443,29 @@ st.markdown(
     .product-sub { color:var(--ei-muted); font-size:12px; margin-top:1px; letter-spacing:.25px; }
     .product-byline { color:var(--ei-muted); font-size:12px; white-space:nowrap; }
 
+    .st-key-security_selector {
+        border:1px solid var(--ei-border); border-radius:var(--ei-radius-sm);
+        background:#0a1728; padding:7px 12px 2px; margin:-5px 0 12px;
+    }
+    .st-key-security_selector [data-testid="stHorizontalBlock"] { align-items:center; }
+    .st-key-security_selector [data-testid="stSelectbox"] { margin-bottom:0; }
+    .ticker-selector-label { color:var(--ei-muted); font-size:11px; font-weight:750; text-transform:uppercase; letter-spacing:.65px; }
+
     .security-header {
         display:grid; grid-template-columns:minmax(0,1.55fr) minmax(210px,.8fr); gap:20px;
         align-items:center; background:var(--ei-surface); border:1px solid var(--ei-border);
-        border-radius:var(--ei-radius-md); padding:18px 20px; margin:0 0 22px;
+        border-radius:var(--ei-radius-md); padding:14px 17px; margin:0 0 16px;
     }
     .security-id { display:flex; align-items:center; gap:14px; min-width:0; }
     .security-symbol {
-        min-width:58px; height:48px; padding:0 10px; border-radius:9px; display:grid;
+        min-width:54px; height:44px; padding:0 9px; border-radius:9px; display:grid;
         place-items:center; background:#142744; border:1px solid rgba(96,165,250,.28);
         color:#bfdbfe; font-size:15px; font-weight:800;
     }
-    .security-name { color:var(--ei-text); font-size:20px; font-weight:800; line-height:1.2; }
+    .security-name { color:var(--ei-text); font-size:18px; font-weight:800; line-height:1.2; }
     .security-meta { color:var(--ei-muted); font-size:12px; margin-top:5px; line-height:1.45; }
     .security-quote { text-align:right; }
-    .security-price { color:var(--ei-text); font-size:27px; font-weight:800; line-height:1; }
+    .security-price { color:var(--ei-text); font-size:24px; font-weight:800; line-height:1; }
     .security-change { font-size:13px; font-weight:700; margin-top:7px; }
     .security-stamp { color:var(--ei-muted); font-size:11px; margin-top:6px; line-height:1.4; }
 
@@ -572,9 +582,13 @@ st.markdown(
         [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {
             min-width:100% !important; flex:1 1 100% !important;
         }
-        .product-head { align-items:flex-start; }
-        .product-name { font-size:19px; }
-        .product-byline { display:none; }
+        .product-head { align-items:flex-start; flex-wrap:wrap; }
+        .product-head .identity { width:100%; }
+        .product-name { font-size:18px; }
+        .product-byline { display:block; width:100%; padding-left:46px; margin-top:-8px; font-size:10.5px; }
+        .product-sub { max-width:270px; line-height:1.35; }
+        .st-key-security_selector { padding:5px 9px 0; }
+        .ticker-selector-label { display:none; }
         .security-header { padding:15px; }
         .security-id { align-items:flex-start; }
         .security-symbol { min-width:52px; height:43px; }
@@ -643,7 +657,29 @@ NOTES = {
     "AST SpaceMobile": "AST SpaceMobile is a space and telecom company trying to connect regular smartphones directly to satellites. I like AST SpaceMobile as a high-risk sleeper stock because the potential market could be huge if the technology works and scales. The main risk is that the business is expensive, unproven, and may need a lot of capital before becoming profitable.",
 }
  
-PERIOD_MAP = {"1M": "1mo", "6M": "6mo", "1Y": "1y", "5Y": "5y", "All": "max"}
+PERIOD_MAP = {"1M": "1mo", "6M": "6mo", "1Y": "1y", "3Y": "3y", "5Y": "5y", "Max": "max"}
+
+PEER_GROUPS = {
+    "Apple": ["Microsoft", "Alphabet / Google", "Meta", "Amazon"],
+    "Microsoft": ["Apple", "Alphabet / Google", "Amazon", "Meta"],
+    "Alphabet / Google": ["Meta", "Microsoft", "Amazon", "Apple"],
+    "Meta": ["Alphabet / Google", "Microsoft", "Amazon", "Apple"],
+    "Amazon": ["Microsoft", "Alphabet / Google", "Meta", "Apple"],
+    "Nvidia": ["AMD", "Broadcom", "Microsoft"],
+    "AMD": ["Nvidia", "Broadcom", "Microsoft"],
+    "Broadcom": ["Nvidia", "AMD", "Microsoft"],
+    "Palantir": ["Microsoft", "Alphabet / Google", "Amazon"],
+    "Tesla": ["Uber", "Apple", "Amazon"],
+    "JPMorgan Chase": ["Goldman Sachs", "Visa", "Berkshire Hathaway", "SoFi"],
+    "Goldman Sachs": ["JPMorgan Chase", "Visa", "Berkshire Hathaway", "SoFi"],
+    "Visa": ["JPMorgan Chase", "Goldman Sachs", "SoFi"],
+    "Berkshire Hathaway": ["JPMorgan Chase", "Goldman Sachs", "Lockheed Martin"],
+    "Lockheed Martin": ["Rocket Lab", "AST SpaceMobile", "Berkshire Hathaway"],
+    "Rocket Lab": ["AST SpaceMobile", "Lockheed Martin", "Palantir"],
+    "AST SpaceMobile": ["Rocket Lab", "Lockheed Martin", "Palantir"],
+    "SoFi": ["JPMorgan Chase", "Goldman Sachs", "Visa"],
+    "Uber": ["Tesla", "Amazon", "Meta"],
+}
  
 # =============================================================
 # DATA FUNCTIONS
@@ -765,6 +801,65 @@ def get_financials(symbol):
         logger.exception("Could not load financial statements for %s", symbol)
         out["error"] = "Financial statement data could not be loaded."
     return out
+
+
+@st.cache_data(ttl=900)
+def get_financial_statements(symbol, quarterly=False):
+    """Load the three reported statement tables without manufacturing gaps."""
+    empty = {"income": pd.DataFrame(), "balance": pd.DataFrame(), "cashflow": pd.DataFrame(), "error": None}
+    try:
+        company = yf.Ticker(symbol)
+        if quarterly:
+            empty["income"] = getattr(company, "quarterly_income_stmt", pd.DataFrame())
+            empty["balance"] = getattr(company, "quarterly_balance_sheet", pd.DataFrame())
+            empty["cashflow"] = getattr(company, "quarterly_cashflow", pd.DataFrame())
+        else:
+            empty["income"] = getattr(company, "income_stmt", pd.DataFrame())
+            empty["balance"] = getattr(company, "balance_sheet", pd.DataFrame())
+            empty["cashflow"] = getattr(company, "cashflow", pd.DataFrame())
+        return empty
+    except Exception:
+        logger.exception("Could not load financial statements for %s", symbol)
+        empty["error"] = "Financial statement data could not be loaded."
+        return empty
+
+
+@st.cache_data(ttl=1800)
+def get_company_metrics(company_names):
+    """Load comparable company metrics only on pages that need them."""
+    rows = []
+    for company_name in company_names:
+        symbol = COMPANIES[company_name]
+        info = get_fundamentals(symbol)
+        revenue = g(info, "totalRevenue")
+        free_cash_flow = g(info, "freeCashflow")
+        market_cap = g(info, "marketCap")
+        rows.append({
+            "Company": company_name,
+            "Ticker": symbol,
+            "Market Cap": market_cap,
+            "P/E TTM": g(info, "trailingPE"),
+            "EV / EBITDA": g(info, "enterpriseToEbitda"),
+            "Revenue Growth": g(info, "revenueGrowth"),
+            "Profit Margin": g(info, "profitMargins"),
+            "Operating Margin": g(info, "operatingMargins"),
+            "FCF Margin": (free_cash_flow / revenue) if free_cash_flow is not None and revenue else None,
+            "Price / FCF": (market_cap / free_cash_flow) if market_cap is not None and free_cash_flow and free_cash_flow > 0 else None,
+        })
+    return pd.DataFrame(rows)
+
+
+@st.cache_data(ttl=900)
+def get_peer_price_history(company_names, period="3y"):
+    series = {}
+    for company_name in company_names:
+        symbol = COMPANIES[company_name]
+        data = get_stock_data(symbol, period, "1d")
+        if not data.empty and "Close" in data:
+            close = pd.to_numeric(data["Close"], errors="coerce").dropna()
+            if len(close) >= 2:
+                series[f"{company_name} ({symbol})"] = close / close.iloc[0] * 100.0
+    return pd.DataFrame(series)
 
 
 @st.cache_data(ttl=900)
@@ -936,35 +1031,42 @@ def fmt_pct(v):
 st.sidebar.markdown(
     """
     <div class="sb-brand">
-        <div class="t">Equity Intelligence</div>
-        <div class="s">Equity Research Platform</div>
+        <div class="t">Equity Research Dashboard</div>
+        <div class="s">Built by Garrett Ewy</div>
     </div>
     """,
     unsafe_allow_html=True,
 )
 
 PAGES = [
-    "Overview", "Company Analysis", "Financials", "Valuation",
-    "Watchlist", "Research Notes", "About",
+    "Overview", "Price & Chart", "Financial Statements", "Company Analysis",
+    "Research Universe", "Research Notes", "DCF Model", "Relative Valuation",
+    "Risk & Performance", "Peer Comparison", "Monte Carlo — Coming Soon",
+    "Company Profile", "Sources & Methodology", "About",
 ]
 
 LEGACY_PAGE_NAMES = {
     "🏠  Overview": "Overview",
     "📊  Company Analysis": "Company Analysis",
-    "📈  Financials": "Financials",
-    "💲  Valuation": "Valuation",
-    "⭐  Watchlist": "Watchlist",
+    "📈  Financials": "Financial Statements",
+    "💲  Valuation": "DCF Model",
+    "⭐  Watchlist": "Research Universe",
     "📓  Notebook": "Research Notes",
     "⚙️  Settings": "About",
 }
+LEGACY_PAGE_NAMES.update({
+    "Financials": "Financial Statements",
+    "Valuation": "DCF Model",
+    "Watchlist": "Research Universe",
+})
 for state_key in ("active_page", "mobile_navigation"):
     if st.session_state.get(state_key) in LEGACY_PAGE_NAMES:
         st.session_state[state_key] = LEGACY_PAGE_NAMES[st.session_state[state_key]]
 
 NAV_GROUPS = {
-    "RESEARCH": ["Overview", "Company Analysis", "Financials", "Watchlist", "Research Notes"],
-    "VALUATION": ["Valuation"],
-    "INFORMATION": ["About"],
+    "RESEARCH": ["Overview", "Price & Chart", "Financial Statements", "Company Analysis", "Research Universe", "Research Notes"],
+    "VALUATION & RISK": ["DCF Model", "Relative Valuation", "Risk & Performance", "Peer Comparison", "Monte Carlo — Coming Soon"],
+    "REFERENCE": ["Company Profile", "Sources & Methodology", "About"],
 }
 
 
@@ -990,6 +1092,10 @@ def sync_mobile_navigation():
         st.session_state[nav_key(group_name)] = selected if selected in group_pages else None
 
 
+if st.session_state.get("active_page") not in PAGES:
+    st.session_state["active_page"] = PAGES[0]
+if st.session_state.get("mobile_navigation") not in PAGES:
+    st.session_state["mobile_navigation"] = st.session_state["active_page"]
 st.session_state.setdefault("active_page", PAGES[0])
 st.session_state.setdefault("mobile_navigation", st.session_state["active_page"])
 
@@ -1056,7 +1162,7 @@ def security_header(info):
     else:
         timestamp = "Timestamp unavailable"
 
-    price_text = format_price(price)
+    price_text = format_price(price) if price is not None else "Data unavailable"
     if change is not None and change_pct is not None:
         direction = "pos" if change >= 0 else "neg"
         change_text = f"{change:+,.2f} ({change_pct:+.2f}%)"
@@ -1167,13 +1273,13 @@ def summary_cards():
             )
  
  
-def price_chart(height=430, key="period_main"):
+def price_chart(height=430, key="period_main", selected_interval="1d", chart_type="Candlestick", show_volume=False):
     pcols = st.columns([3, 2])
     with pcols[1]:
         sel = st.radio("period", list(PERIOD_MAP.keys()), index=2, horizontal=True,
                        key=key, label_visibility="collapsed")
     period = PERIOD_MAP[sel]
-    data = get_stock_data(ticker, period, interval)
+    data = get_stock_data(ticker, period, selected_interval)
     if data.empty:
         st.error("Could not load price data for this ticker (may be unavailable or rate-limited).")
         return None
@@ -1183,12 +1289,18 @@ def price_chart(height=430, key="period_main"):
     data["MA200"] = data["Close"].rolling(200).mean()
  
     fig = go.Figure()
-    fig.add_trace(go.Candlestick(
-        x=data["Date"], open=data["Open"], high=data["High"], low=data["Low"], close=data["Close"],
-        name="Price",
-        increasing=dict(line=dict(color=GREEN), fillcolor=GREEN),
-        decreasing=dict(line=dict(color=RED), fillcolor=RED),
-    ))
+    if chart_type == "Candlestick":
+        fig.add_trace(go.Candlestick(
+            x=data["Date"], open=data["Open"], high=data["High"], low=data["Low"], close=data["Close"],
+            name="Price",
+            increasing=dict(line=dict(color=GREEN), fillcolor=GREEN),
+            decreasing=dict(line=dict(color=RED), fillcolor=RED),
+        ))
+    else:
+        fig.add_trace(go.Scatter(
+            x=data["Date"], y=data["Close"], mode="lines", name="Close",
+            line=dict(color=BLUE_LT, width=2.2),
+        ))
     fig.add_trace(go.Scatter(x=data["Date"], y=data["MA50"], mode="lines",
                              name="MA50", line=dict(color=ORANGE, width=1.7)))
     fig.add_trace(go.Scatter(x=data["Date"], y=data["MA200"], mode="lines",
@@ -1203,6 +1315,18 @@ def price_chart(height=430, key="period_main"):
     fig.update_xaxes(gridcolor="rgba(255,255,255,0.05)", zeroline=False)
     fig.update_yaxes(gridcolor="rgba(255,255,255,0.05)", zeroline=False)
     st.plotly_chart(fig, width="stretch", config={"displayModeBar": False})
+    if show_volume and "Volume" in data:
+        volume = go.Figure(go.Bar(
+            x=data["Date"], y=data["Volume"], name="Volume", marker_color="#315b86",
+        ))
+        volume.update_layout(
+            template="plotly_dark", height=180, paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)", font=dict(color=TEXT, family="Inter"),
+            margin=dict(l=10, r=10, t=10, b=10), showlegend=False, yaxis_title="Volume",
+        )
+        volume.update_xaxes(gridcolor="rgba(255,255,255,0.05)")
+        volume.update_yaxes(gridcolor="rgba(255,255,255,0.05)")
+        st.plotly_chart(volume, width="stretch", config={"displayModeBar": False})
     return data
  
  
@@ -1229,7 +1353,10 @@ def watchlist_table(df, limit=None):
  
  
 def stat_grid(title, pairs):
-    tiles = "".join(f"<div class='stat'><div class='k'>{k}</div><div class='v'>{v}</div></div>" for k, v in pairs)
+    tiles = "".join(
+        f"<div class='stat'><div class='k'>{k}</div><div class='v'>{'Data unavailable' if v == '—' else v}</div></div>"
+        for k, v in pairs
+    )
     st.markdown(f"<div class='panel'><h4>{title}</h4><div class='stat-grid'>{tiles}</div></div>",
                 unsafe_allow_html=True)
  
@@ -1312,6 +1439,377 @@ def financials_chart():
         st.plotly_chart(fig, width="stretch", config={"displayModeBar": False})
 
 
+def value_or_unavailable(value, formatter):
+    return formatter(value) if value is not None else "Data unavailable"
+
+
+def percent_value(value, signed=False):
+    if value is None:
+        return "Data unavailable"
+    return f"{value * 100:+.1f}%" if signed else f"{value * 100:.1f}%"
+
+
+def default_dcf_snapshot(info):
+    """Calculate unedited scenario values for overview and valuation summaries."""
+    statement_data = get_dcf_financials(ticker)
+    history = statement_data.get("history", [])
+    current_price = g(info, "currentPrice") or g(info, "regularMarketPrice")
+    shares = valuation_share_count(info)
+    if not current_price or not shares:
+        return None
+    model_info = {**info, "_risk_free_rate": get_risk_free_rate()}
+    values = {}
+    if ticker in {"JPM", "GS", "SOFI"}:
+        usable = [row for row in history if row.get("net_income") is not None and row.get("book_equity") is not None]
+        if not usable or usable[-1]["net_income"] <= 0:
+            return None
+        defaults = estimate_equity_dcf_defaults(usable, model_info)
+        for name in ("Bear", "Base", "Bull"):
+            assumptions = equity_scenario_assumptions(defaults, name)
+            try:
+                values[name] = run_equity_dcf(
+                    base_net_income=float(usable[-1]["net_income"]),
+                    starting_roe=defaults["starting_roe"],
+                    year_one_growth=assumptions["year_one_growth"],
+                    final_year_growth=assumptions["final_year_growth"],
+                    target_roe=assumptions["target_roe"],
+                    cost_of_equity=assumptions["cost_of_equity"],
+                    terminal_growth=assumptions["terminal_growth"],
+                    forecast_years=assumptions["forecast_years"],
+                    shares_outstanding=float(shares),
+                )["value_per_share"]
+            except ValueError:
+                return None
+    else:
+        usable = [row for row in history if row.get("revenue") is not None and row.get("fcff") is not None]
+        if not usable:
+            return None
+        defaults = estimate_defaults(usable, model_info)
+        cash = g(info, "totalCash")
+        debt = g(info, "totalDebt")
+        cash = float(cash if cash is not None else statement_data.get("cash") or 0.0)
+        debt = float(debt if debt is not None else statement_data.get("debt") or 0.0)
+        for name in ("Bear", "Base", "Bull"):
+            assumptions = scenario_assumptions(defaults, name)
+            try:
+                values[name] = run_dcf(
+                    base_revenue=float(usable[-1]["revenue"]),
+                    starting_fcff_margin=defaults["starting_fcff_margin"],
+                    year_one_growth=assumptions["year_one_growth"],
+                    final_year_growth=assumptions["final_year_growth"],
+                    target_fcff_margin=assumptions["target_fcff_margin"],
+                    wacc=assumptions["wacc"],
+                    terminal_growth=assumptions["terminal_growth"],
+                    forecast_years=assumptions["forecast_years"],
+                    net_debt=debt - cash,
+                    shares_outstanding=float(shares),
+                )["value_per_share"]
+            except ValueError:
+                return None
+    values["Current"] = float(current_price)
+    return values
+
+
+def render_overview_metrics(info, history):
+    close = history["Close"].dropna() if not history.empty and "Close" in history else pd.Series(dtype=float)
+    one_year = (close.iloc[-1] / close.iloc[0] - 1.0) if len(close) > 1 and close.iloc[0] else None
+    pairs = [
+        ("Current Price", format_price(g(info, "currentPrice") or g(info, "regularMarketPrice"))),
+        ("Market Cap", value_or_unavailable(g(info, "marketCap"), fmt_big)),
+        ("P/E TTM", value_or_unavailable(g(info, "trailingPE"), lambda value: f"{value:.2f}x")),
+        ("Revenue TTM", value_or_unavailable(g(info, "totalRevenue"), fmt_big)),
+        ("Free Cash Flow TTM", value_or_unavailable(g(info, "freeCashflow"), fmt_big)),
+        ("1Y Performance", percent_value(one_year, signed=True)),
+    ]
+    stat_grid("Executive Snapshot", pairs)
+
+
+STATEMENT_LINES = {
+    "Income Statement": [
+        ("Revenue", ["Total Revenue", "Operating Revenue"]),
+        ("Gross Profit", ["Gross Profit"]),
+        ("Operating Income", ["Operating Income"]),
+        ("EBIT", ["EBIT"]),
+        ("Net Income", ["Net Income", "Net Income Common Stockholders"]),
+        ("Diluted EPS", ["Diluted EPS", "Basic EPS"]),
+    ],
+    "Balance Sheet": [
+        ("Cash", ["Cash Cash Equivalents And Short Term Investments", "Cash And Cash Equivalents"]),
+        ("Total Assets", ["Total Assets"]),
+        ("Total Debt", ["Total Debt"]),
+        ("Total Liabilities", ["Total Liabilities Net Minority Interest", "Total Liabilities"]),
+        ("Shareholders’ Equity", ["Stockholders Equity", "Common Stock Equity"]),
+    ],
+    "Cash Flow Statement": [
+        ("Operating Cash Flow", ["Operating Cash Flow", "Total Cash From Operating Activities"]),
+        ("Capital Expenditures", ["Capital Expenditure", "Capital Expenditures"]),
+        ("Free Cash Flow", ["Free Cash Flow"]),
+    ],
+}
+
+
+def statement_display_frame(statement, definitions):
+    if statement is None or statement.empty:
+        return pd.DataFrame()
+    periods = list(statement.columns)[:6]
+    rows = []
+    for label, candidates in definitions:
+        row = {"Line Item": label}
+        available = False
+        for period in periods:
+            value = statement_value(statement, candidates, period)
+            heading = pd.to_datetime(period).strftime("%b %Y") if not isinstance(period, str) else period
+            row[heading] = value
+            available = available or value is not None
+        if available:
+            rows.append(row)
+    return pd.DataFrame(rows)
+
+
+def render_financial_statements():
+    financials_chart()
+    frequency = st.radio("Reporting frequency", ["Annual", "Quarterly"], horizontal=True, key=f"statement_frequency_{ticker}")
+    statements = get_financial_statements(ticker, quarterly=frequency == "Quarterly")
+    tabs = st.tabs(list(STATEMENT_LINES))
+    keys = {"Income Statement": "income", "Balance Sheet": "balance", "Cash Flow Statement": "cashflow"}
+    for tab, name in zip(tabs, STATEMENT_LINES):
+        with tab:
+            frame = statement_display_frame(statements[keys[name]], STATEMENT_LINES[name])
+            if frame.empty:
+                st.info("Data unavailable for this statement and reporting frequency.")
+            else:
+                display = frame.copy()
+                for column in display.columns[1:]:
+                    if name == "Income Statement" and display.iloc[:, 0].eq("Diluted EPS").any():
+                        display[column] = [fmt_x(value) if label == "Diluted EPS" else fmt_big(value) for label, value in zip(display["Line Item"], display[column])]
+                    else:
+                        display[column] = display[column].map(fmt_big)
+                st.dataframe(display, hide_index=True, width="stretch")
+    st.caption("Reported figures from Yahoo Finance via yfinance. Missing line items are omitted rather than estimated.")
+
+
+def derived_analysis(info, dcf_values):
+    strengths, risks, drivers = [], [], []
+    revenue_growth = g(info, "revenueGrowth")
+    operating_margin = g(info, "operatingMargins")
+    fcf = g(info, "freeCashflow")
+    beta = g(info, "beta")
+    trailing_pe = g(info, "trailingPE")
+    if revenue_growth is not None and revenue_growth > 0:
+        strengths.append(f"Reported TTM revenue growth is {revenue_growth:.1%}.")
+        drivers.append("Continued revenue growth is a measurable driver to monitor.")
+    if operating_margin is not None and operating_margin > 0.15:
+        strengths.append(f"Operating margin is {operating_margin:.1%}, indicating solid operating profitability.")
+    if fcf is not None and fcf > 0:
+        strengths.append(f"Reported free cash flow is positive at {fmt_big(fcf)}.")
+    if beta is not None and beta > 1.3:
+        risks.append(f"Beta of {beta:.2f} indicates above-market historical sensitivity.")
+    if trailing_pe is not None and trailing_pe > 40:
+        risks.append(f"A {trailing_pe:.1f}x trailing P/E embeds demanding expectations.")
+    if fcf is not None and fcf < 0:
+        risks.append("Reported free cash flow is negative, increasing forecast uncertainty.")
+    if not strengths:
+        strengths.append("Available reported metrics do not support a clear quantitative strength signal.")
+    if not risks:
+        risks.append("No single threshold-based risk signal was triggered; company-specific risks still require qualitative review.")
+    industry = g(info, "industry")
+    if industry:
+        drivers.append(f"Execution and demand trends in {industry} are the primary operating variables to follow.")
+    if not drivers:
+        drivers.append("Growth-driver data is unavailable from the current provider.")
+    valuation = "DCF data unavailable."
+    if dcf_values and dcf_values.get("Base") and dcf_values.get("Current"):
+        gap = dcf_values["Base"] / dcf_values["Current"] - 1
+        valuation = f"The default Base DCF estimate is {format_price(dcf_values['Base'])}, implying {gap:+.1%} versus the latest market price. This is an assumption-driven estimate, not a price target."
+    return strengths, risks, drivers, valuation
+
+
+def render_company_analysis(info):
+    description = g(info, "longBusinessSummary")
+    st.markdown("#### Sourced company information")
+    st.markdown(f"<div class='panel'><p class='small-muted'>{escape(description) if description else 'Data unavailable'}</p></div>", unsafe_allow_html=True)
+    research_note_block()
+    dcf_values = default_dcf_snapshot(info)
+    strengths, risks, drivers, valuation = derived_analysis(info, dcf_values)
+    left, right = st.columns(2)
+    with left:
+        st.markdown("#### Key strengths · derived from reported metrics")
+        st.markdown("\n".join(f"- {item}" for item in strengths))
+        st.markdown("#### Growth drivers · research prompts")
+        st.markdown("\n".join(f"- {item}" for item in drivers))
+    with right:
+        st.markdown("#### Key risks · derived from reported metrics")
+        st.markdown("\n".join(f"- {item}" for item in risks))
+        st.markdown("#### Financial quality")
+        stat_grid("Reported quality indicators", [
+            ("Revenue growth", percent_value(g(info, "revenueGrowth"))),
+            ("Operating margin", percent_value(g(info, "operatingMargins"))),
+            ("Profit margin", percent_value(g(info, "profitMargins"))),
+            ("Return on equity", percent_value(g(info, "returnOnEquity"))),
+        ])
+    st.markdown("#### Valuation discussion · model-derived")
+    st.info(valuation)
+
+
+def render_relative_valuation(info):
+    revenue = g(info, "totalRevenue")
+    fcf = g(info, "freeCashflow")
+    market_cap = g(info, "marketCap")
+    price_fcf = market_cap / fcf if market_cap is not None and fcf and fcf > 0 else None
+    stat_grid(f"Trading Multiples — {ticker}", [
+        ("Trailing P/E", fmt_x(g(info, "trailingPE"), "x")),
+        ("Forward P/E", fmt_x(g(info, "forwardPE"), "x")),
+        ("PEG", fmt_x(g(info, "pegRatio"), "x")),
+        ("EV / EBITDA", fmt_x(g(info, "enterpriseToEbitda"), "x")),
+        ("Price / Sales", fmt_x(g(info, "priceToSalesTrailing12Months"), "x")),
+        ("Price / Book", fmt_x(g(info, "priceToBook"), "x")),
+        ("Price / FCF", fmt_x(price_fcf, "x")),
+    ])
+    peer_names = [selected_company, *PEER_GROUPS.get(selected_company, [])]
+    peers = get_company_metrics(peer_names)
+    st.markdown("#### Relevant peer snapshot")
+    display = peers.copy()
+    display["Market Cap"] = display["Market Cap"].map(fmt_big)
+    for column in ["P/E TTM", "EV / EBITDA", "Price / FCF"]:
+        display[column] = display[column].map(lambda value: fmt_x(value, "x") if pd.notna(value) else "Data unavailable")
+    for column in ["Revenue Growth", "Operating Margin", "FCF Margin"]:
+        display[column] = display[column].map(lambda value: f"{value:.1%}" if pd.notna(value) else "Data unavailable")
+    st.dataframe(display[["Company", "Ticker", "Market Cap", "P/E TTM", "EV / EBITDA", "Revenue Growth", "Operating Margin", "FCF Margin"]], hide_index=True, width="stretch")
+    st.caption("Peers are selected from the dashboard’s 19-company research universe. Values are provider-reported or directly calculated; unavailable metrics are not estimated.")
+
+
+def render_risk_performance(info):
+    history = get_stock_data(ticker, "5y", "1d")
+    if history.empty or "Close" not in history:
+        st.info("Data unavailable for risk and performance calculations.")
+        return
+    close = history["Close"].dropna()
+    risk_free = get_risk_free_rate()
+    stats = risk_statistics(close, risk_free)
+    stat_grid("Risk & Return Snapshot", [
+        ("Beta", fmt_x(g(info, "beta"))),
+        ("Annualized volatility", percent_value(stats["annualized_volatility"])),
+        ("Maximum drawdown", percent_value(stats["maximum_drawdown"], signed=True)),
+        ("1Y return", percent_value(stats["return_1y"], signed=True)),
+        ("3Y return", percent_value(stats["return_3y"], signed=True)),
+        ("Sharpe ratio", fmt_x(stats["sharpe_ratio"])),
+        ("Downside volatility", percent_value(stats["downside_volatility"])),
+    ])
+    returns = close.pct_change(fill_method=None).dropna()
+    cumulative = close / close.iloc[0] * 100
+    drawdown = close / close.cummax() - 1
+    rolling_vol = returns.rolling(63).std() * (252 ** 0.5)
+    tab1, tab2, tab3 = st.tabs(["Cumulative Return", "Drawdown", "Rolling Volatility"])
+    charts = [
+        (tab1, cumulative, "Growth of $100", BLUE_LT, "Index"),
+        (tab2, drawdown * 100, "Drawdown", RED, "%"),
+        (tab3, rolling_vol * 100, "63-day Rolling Annualized Volatility", ORANGE, "%"),
+    ]
+    for tab, series, name, color, y_title in charts:
+        with tab:
+            fig = go.Figure(go.Scatter(x=series.index, y=series, mode="lines", name=name, line=dict(color=color, width=2)))
+            fig.update_layout(template="plotly_dark", height=330, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font=dict(color=TEXT, family="Inter"), margin=dict(l=10, r=10, t=20, b=10), yaxis_title=y_title)
+            fig.update_xaxes(gridcolor="rgba(255,255,255,0.05)")
+            fig.update_yaxes(gridcolor="rgba(255,255,255,0.05)")
+            st.plotly_chart(fig, width="stretch", config={"displayModeBar": False})
+    with st.expander("Metric definitions"):
+        st.markdown(
+            "- **Beta:** provider-reported sensitivity to market movements.\n"
+            "- **Annualized volatility:** standard deviation of daily returns × √252.\n"
+            "- **Maximum drawdown:** largest peak-to-trough decline in the available five-year series.\n"
+            "- **Sharpe ratio:** annualized excess daily return divided by annualized volatility, using the current 10-year Treasury proxy.\n"
+            "- **Downside volatility:** annualized standard deviation of negative daily returns."
+        )
+
+
+def render_peer_comparison():
+    peer_names = [selected_company, *PEER_GROUPS.get(selected_company, [])]
+    metrics = get_company_metrics(peer_names)
+    history = get_peer_price_history(peer_names)
+    if not history.empty:
+        fig = go.Figure()
+        for column in history.columns:
+            fig.add_trace(go.Scatter(x=history.index, y=history[column], mode="lines", name=column))
+        fig.update_layout(template="plotly_dark", height=360, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font=dict(color=TEXT, family="Inter"), margin=dict(l=10, r=10, t=20, b=10), yaxis_title="Growth of $100", legend=dict(orientation="h"))
+        fig.update_xaxes(gridcolor="rgba(255,255,255,0.05)")
+        fig.update_yaxes(gridcolor="rgba(255,255,255,0.05)")
+        st.plotly_chart(fig, width="stretch", config={"displayModeBar": False})
+    else:
+        st.info("Price performance data unavailable for this peer group.")
+    chart_metrics = metrics.set_index("Ticker")[["Revenue Growth", "Profit Margin", "Operating Margin"]] * 100
+    if not chart_metrics.dropna(how="all").empty:
+        bar = go.Figure()
+        for column in chart_metrics.columns:
+            bar.add_trace(go.Bar(x=chart_metrics.index, y=chart_metrics[column], name=column))
+        bar.update_layout(template="plotly_dark", barmode="group", height=320, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font=dict(color=TEXT, family="Inter"), margin=dict(l=10, r=10, t=20, b=10), yaxis_title="%")
+        st.plotly_chart(bar, width="stretch", config={"displayModeBar": False})
+    display = metrics.copy()
+    display["Market Cap"] = display["Market Cap"].map(fmt_big)
+    for column in ["Revenue Growth", "Profit Margin", "Operating Margin"]:
+        display[column] = display[column].map(lambda value: f"{value:.1%}" if pd.notna(value) else "Data unavailable")
+    for column in ["P/E TTM", "EV / EBITDA"]:
+        display[column] = display[column].map(lambda value: f"{value:.2f}x" if pd.notna(value) else "Data unavailable")
+    st.dataframe(display[["Company", "Ticker", "Market Cap", "Revenue Growth", "Profit Margin", "Operating Margin", "P/E TTM", "EV / EBITDA"]], hide_index=True, width="stretch")
+
+
+def render_company_profile(info):
+    city, state, country = g(info, "city"), g(info, "state"), g(info, "country")
+    headquarters = ", ".join(str(value) for value in (city, state, country) if value) or "Data unavailable"
+    employees = g(info, "fullTimeEmployees")
+    fields = [
+        ("Company name", g(info, "longName") or selected_company),
+        ("Ticker", ticker),
+        ("Exchange", g(info, "fullExchangeName") or g(info, "exchange") or "Data unavailable"),
+        ("Sector", g(info, "sector") or "Data unavailable"),
+        ("Industry", g(info, "industry") or "Data unavailable"),
+        ("Market cap", value_or_unavailable(g(info, "marketCap"), fmt_big)),
+        ("Headquarters", headquarters),
+        ("Employees", f"{employees:,.0f}" if employees is not None else "Data unavailable"),
+    ]
+    stat_grid("Company Facts", fields)
+    st.markdown("#### Business description")
+    description = g(info, "longBusinessSummary")
+    st.markdown(f"<div class='panel'><p class='small-muted'>{escape(description) if description else 'Data unavailable'}</p></div>", unsafe_allow_html=True)
+    st.caption("Factual company fields and description are supplied by Yahoo Finance via yfinance.")
+
+
+def render_research_universe(comparison):
+    fundamentals = get_company_metrics(list(COMPANIES))[["Company", "Market Cap"]]
+    universe = comparison.merge(fundamentals, on="Company", how="left")
+    f1, f2, f3 = st.columns(3)
+    with f1:
+        categories = st.multiselect("Category", sorted(universe["Category"].dropna().unique()), key="universe_category")
+    with f2:
+        risks = st.multiselect("Risk level", sorted(universe["Risk Level"].dropna().unique()), key="universe_risk")
+    with f3:
+        market_band = st.selectbox("Market cap", ["All", "Mega / Large (≥$200B)", "Mid ($10B–$200B)", "Small (<$10B)"], key="universe_market_cap")
+    performance_values = pd.to_numeric(universe["1Y Return %"], errors="coerce").dropna()
+    performance_filter = None
+    if not performance_values.empty:
+        low, high = float(performance_values.min()), float(performance_values.max())
+        performance_filter = st.slider("Up to 1Y performance (%)", low, high, (low, high), key="universe_performance")
+    filtered = universe.copy()
+    if categories:
+        filtered = filtered[filtered["Category"].isin(categories)]
+    if risks:
+        filtered = filtered[filtered["Risk Level"].isin(risks)]
+    if market_band.startswith("Mega"):
+        filtered = filtered[filtered["Market Cap"] >= 200e9]
+    elif market_band.startswith("Mid"):
+        filtered = filtered[(filtered["Market Cap"] >= 10e9) & (filtered["Market Cap"] < 200e9)]
+    elif market_band.startswith("Small"):
+        filtered = filtered[filtered["Market Cap"] < 10e9]
+    if performance_filter:
+        filtered = filtered[pd.to_numeric(filtered["1Y Return %"], errors="coerce").between(*performance_filter)]
+    st.markdown("#### Speculative Coverage")
+    st.caption("Higher-risk research names, not investment recommendations.")
+    speculative = comparison[comparison["Company"].isin(SLEEPER_STOCKS)]
+    styled_comparison(speculative)
+    st.markdown("#### Full 19-company research universe")
+    styled_comparison(filtered)
+    st.download_button("Download filtered universe (CSV)", filtered.to_csv(index=False).encode("utf-8"), file_name="equity_research_universe.csv", mime="text/csv")
+
+
 def render_bank_equity_dcf(info, statement_data):
     """Render a bank-appropriate FCFE valuation instead of misusing net debt."""
     history = [
@@ -1319,10 +1817,7 @@ def render_bank_equity_dcf(info, statement_data):
         if row.get("net_income") is not None and row.get("book_equity") is not None
     ]
     current_price = g(info, "currentPrice") or g(info, "regularMarketPrice")
-    shares = g(info, "sharesOutstanding") or g(info, "impliedSharesOutstanding")
-    market_cap = g(info, "marketCap")
-    if shares is None and market_cap and current_price:
-        shares = market_cap / current_price
+    shares = valuation_share_count(info)
     if not history or history[-1]["net_income"] <= 0 or not current_price or not shares:
         st.error("Positive earnings, common equity, price, and share-count data are required for this bank equity DCF.")
         return
@@ -1403,11 +1898,11 @@ def render_bank_equity_dcf(info, statement_data):
 
     fair_value = result["value_per_share"]
     upside = (fair_value / float(current_price) - 1.0) * 100.0
-    default_values = []
+    default_values = {}
     for name in ["Bear", "Base", "Bull"]:
         assumptions = equity_scenario_assumptions(defaults, name)
         try:
-            default_values.append(run_equity_dcf(
+            default_values[name] = run_equity_dcf(
                 base_net_income=float(history[-1]["net_income"]),
                 starting_roe=defaults["starting_roe"],
                 year_one_growth=assumptions["year_one_growth"],
@@ -1417,21 +1912,36 @@ def render_bank_equity_dcf(info, statement_data):
                 terminal_growth=assumptions["terminal_growth"],
                 forecast_years=assumptions["forecast_years"],
                 shares_outstanding=float(shares),
-            )["value_per_share"])
+            )["value_per_share"]
         except ValueError:
             pass
-    range_text = f"{format_price(min(default_values))}–{format_price(max(default_values))}" if default_values else "—"
+    default_values[scenario_name] = fair_value
+    range_text = f"{format_price(min(default_values.values()))}–{format_price(max(default_values.values()))}" if default_values else "—"
+    base_value = default_values.get("Base")
+    base_gap = (base_value / float(current_price) - 1.0) * 100 if base_value is not None else None
     result_tiles = [
         ("Current Price", format_price(current_price), ""),
-        (f"{scenario_name} Equity DCF", format_price(fair_value), ""),
-        ("Upside / Downside", f"{upside:+.1f}%", "pos" if upside >= 0 else "neg"),
-        ("Default Scenario Range", range_text, ""),
+        ("Bear DCF Value", format_price(default_values.get("Bear")), ""),
+        ("Base DCF Value", format_price(base_value), ""),
+        ("Bull DCF Value", format_price(default_values.get("Bull")), ""),
+        ("Base Upside / Downside", f"{base_gap:+.1f}%" if base_gap is not None else "—", "pos" if base_gap is not None and base_gap >= 0 else "neg"),
+        ("Valuation Range", range_text, ""),
     ]
     result_html = "".join(
         f"<div class='dcf-result'><div class='k'>{label}</div><div class='v {css}'>{value}</div></div>"
         for label, value, css in result_tiles
     )
     st.markdown(f"<div class='dcf-result-grid'>{result_html}</div>", unsafe_allow_html=True)
+    if base_gap is not None:
+        relation = "below" if base_gap >= 0 else "above"
+        st.caption(f"The current market price is {abs(base_gap):.1f}% {relation} the default Base equity DCF estimate.")
+    stat_grid("Equity-value bridge", [
+        ("Present value of forecast FCFE", fmt_big(result["present_value_fcfe"])),
+        ("Present value of terminal value", fmt_big(result["present_value_terminal"])),
+        ("Equity value", fmt_big(result["equity_value"])),
+        ("Diluted shares", f"{float(shares) / 1e9:,.2f}B"),
+        (f"{scenario_name} implied share price", format_price(fair_value)),
+    ])
     if result["terminal_value_share"] > 0.80:
         st.info(f"{result['terminal_value_share']:.0%} of equity value comes from the terminal value. Treat the result as assumption-sensitive.")
 
@@ -1535,10 +2045,7 @@ def render_dcf_model(info):
         return
 
     current_price = g(info, "currentPrice") or g(info, "regularMarketPrice")
-    shares = g(info, "sharesOutstanding") or g(info, "impliedSharesOutstanding")
-    market_cap = g(info, "marketCap")
-    if shares is None and market_cap and current_price:
-        shares = market_cap / current_price
+    shares = valuation_share_count(info)
     if not current_price or not shares:
         st.error("Current price or share-count data is unavailable, so per-share DCF value cannot be calculated.")
         return
@@ -1652,11 +2159,11 @@ def render_dcf_model(info):
     fair_value = result["value_per_share"]
     upside = (fair_value / float(current_price) - 1.0) * 100.0
     upside_class = "pos" if upside >= 0 else "neg"
-    default_values = []
+    default_values = {}
     for name in ["Bear", "Base", "Bull"]:
         assumptions = scenario_assumptions(defaults, name)
         try:
-            default_values.append(run_dcf(
+            default_values[name] = run_dcf(
                 base_revenue=base_revenue,
                 starting_fcff_margin=defaults["starting_fcff_margin"],
                 year_one_growth=assumptions["year_one_growth"],
@@ -1667,24 +2174,41 @@ def render_dcf_model(info):
                 forecast_years=assumptions["forecast_years"],
                 net_debt=net_debt,
                 shares_outstanding=float(shares),
-            )["value_per_share"])
+            )["value_per_share"]
         except ValueError:
             pass
+    default_values[scenario_name] = fair_value
     range_text = "—"
     if default_values:
-        range_text = f"{format_price(min(default_values))}–{format_price(max(default_values))}"
+        range_text = f"{format_price(min(default_values.values()))}–{format_price(max(default_values.values()))}"
+
+    base_value = default_values.get("Base")
+    base_gap = (base_value / float(current_price) - 1.0) * 100 if base_value is not None else None
 
     result_tiles = [
         ("Current Price", format_price(current_price), ""),
-        (f"{scenario_name} DCF Value", format_price(fair_value), ""),
-        ("Upside / Downside", f"{upside:+.1f}%", upside_class),
-        ("Default Scenario Range", range_text, ""),
+        ("Bear DCF Value", format_price(default_values.get("Bear")), ""),
+        ("Base DCF Value", format_price(base_value), ""),
+        ("Bull DCF Value", format_price(default_values.get("Bull")), ""),
+        ("Base Upside / Downside", f"{base_gap:+.1f}%" if base_gap is not None else "—", "pos" if base_gap is not None and base_gap >= 0 else "neg"),
+        ("Valuation Range", range_text, ""),
     ]
     result_html = "".join(
         f"<div class='dcf-result'><div class='k'>{label}</div><div class='v {css}'>{value}</div></div>"
         for label, value, css in result_tiles
     )
     st.markdown(f"<div class='dcf-result-grid'>{result_html}</div>", unsafe_allow_html=True)
+
+    if base_gap is not None:
+        relation = "below" if base_gap >= 0 else "above"
+        st.caption(f"The current market price is {abs(base_gap):.1f}% {relation} the default Base DCF estimate.")
+    stat_grid("Enterprise-to-equity bridge", [
+        ("Enterprise Value", fmt_big(result["enterprise_value"])),
+        ("Less: Net Debt", fmt_big(net_debt)),
+        ("Equity Value", fmt_big(result["equity_value"])),
+        ("Diluted Shares", f"{float(shares) / 1e9:,.2f}B"),
+        (f"{scenario_name} Implied Share Price", format_price(fair_value)),
+    ])
 
     if result["present_value_fcff"] < 0:
         st.warning("Forecast-period FCFF remains negative, so the valuation depends entirely on later profitability and terminal value.")
@@ -1794,6 +2318,9 @@ def render_dcf_model(info):
                 ("Shares and price", "Current Yahoo Finance company data"),
                 ("Risk-free rate", f"10Y Treasury proxy (^TNX) · {defaults['risk_free_rate']:.2%}"),
                 ("Equity risk premium", f"Model assumption · {defaults['equity_risk_premium']:.2%}"),
+                ("Beta", f"Yahoo Finance · {g(info, 'beta') or 1.0:.2f}"),
+                ("Cost of equity", f"Risk-free rate + beta × equity risk premium · {defaults['cost_of_equity']:.2%}"),
+                ("WACC", "Market-value equity/debt weights; after-tax cost of debt from reported interest and debt"),
             ]
             source_html = "".join(
                 f"<div class='dcf-source'><span class='k'>{label}</span><span class='v'>{value}</span></div>"
@@ -1887,7 +2414,7 @@ with st.container(key="mobile_section_nav"):
     st.selectbox(
         "Choose a research section",
         PAGES,
-        format_func=lambda item: f"Current section: {item}",
+        format_func=lambda item: item,
         key="mobile_navigation",
         on_change=sync_mobile_navigation,
         label_visibility="collapsed",
@@ -1895,18 +2422,13 @@ with st.container(key="mobile_section_nav"):
 
 page = st.session_state["active_page"]
 
-if page in {"Overview", "Company Analysis", "Watchlist"}:
-    comparison_df, basket = get_market_data(COMPANIES)
-if page == "Overview":
-    sp_last, sp_chg, sp_series = get_index_series("^GSPC")
-
 st.markdown(
     """
     <div class="product-head">
         <div class="identity">
-            <div class="product-mark">EI</div>
-            <div><div class="product-name">Equity Intelligence</div>
-            <div class="product-sub">Equity Research Platform</div></div>
+            <div class="product-mark">ER</div>
+            <div><div class="product-name">Equity Research Dashboard</div>
+            <div class="product-sub">Market Data · Fundamental Analysis · Valuation · Quantitative Research</div></div>
         </div>
         <div class="product-byline">Built by Garrett Ewy</div>
     </div>
@@ -1915,177 +2437,190 @@ st.markdown(
 )
 
 # =============================================================
-# MAIN PAGE CONTROLS
+# GLOBAL SECURITY SELECTOR
 # =============================================================
-with st.container(border=True):
-    st.markdown(
-        "<div style='font-size:14px;font-weight:750;color:#e7eef8;margin-bottom:8px;'>Research context</div>",
-        unsafe_allow_html=True,
-    )
-
-    control_1, control_2 = st.columns([2.2, 1.2])
-
-    with control_1:
+with st.container(key="security_selector"):
+    selector_label, selector_control = st.columns([3.2, 1.25])
+    with selector_label:
+        st.markdown("<div class='ticker-selector-label'>Selected security</div>", unsafe_allow_html=True)
+    with selector_control:
         selected_company = st.selectbox(
             "Company / Ticker",
             list(COMPANIES.keys()),
             format_func=lambda company: f"{company} ({COMPANIES[company]})",
             key="main_company_select",
+            label_visibility="collapsed",
         )
-
-    ticker = COMPANIES[selected_company]
-
-    with control_2:
-        interval = st.selectbox(
-            "Chart interval",
-            ["1d", "1wk", "1mo"],
-            index=0,
-            key="main_interval_select",
-        )
+ticker = COMPANIES[selected_company]
 
 if selected_company in SLEEPER_STOCKS:
     st.warning("Higher-risk coverage company. Review the underlying thesis and model assumptions carefully.")
 
-st.markdown("<div style='height:14px;'></div>", unsafe_allow_html=True)
-
-security_info = get_fundamentals(ticker) if page not in {"Watchlist", "About"} else {}
-if page not in {"Watchlist", "About"}:
+company_pages = {
+    "Overview", "Price & Chart", "Financial Statements", "Company Analysis", "Research Notes",
+    "DCF Model", "Relative Valuation", "Risk & Performance", "Peer Comparison", "Company Profile",
+}
+security_info = get_fundamentals(ticker) if page in company_pages else {}
+if page in company_pages:
     security_header(security_info)
 
 if page == "Overview":
-    page_head("Overview", f"Latest available market snapshot across your {len(COMPANIES)}-stock research universe")
-    summary_cards()
-    st.markdown("<div style='height:18px;'></div>", unsafe_allow_html=True)
-    research_note_block(compact=True)
- 
-    left, right = st.columns([2.1, 1])
-    with left:
-        st.markdown(f"<div style='font-size:17px;font-weight:800;color:#f8fafc;margin-bottom:6px;'>"
-                    f"{selected_company} — Price &amp; Moving Averages</div>", unsafe_allow_html=True)
-        with st.container(border=True):
-            chart_data = price_chart(height=420, key="period_overview")
-    with right:
-        watchlist_table(comparison_df)
- 
-    st.markdown("<div style='height:14px;'></div>", unsafe_allow_html=True)
-    info = security_info
-    cc1, cc2 = st.columns([1, 1.1])
-    with cc1:
-        stat_grid(f"Company Analysis — {ticker}", fundamentals_pairs(info))
-    with cc2:
-        financials_chart()
- 
-    st.markdown("<div style='height:14px;'></div>", unsafe_allow_html=True)
-    st.markdown("<div style='font-size:17px;font-weight:800;color:#f8fafc;margin-bottom:6px;'>Data Log</div>",
-                unsafe_allow_html=True)
-    data_log_block(chart_data)
- 
-elif page == "Company Analysis":
-    page_head(f"Company Analysis — {selected_company}", CATEGORIES.get(selected_company, ""))
-    info = security_info
+    page_head(f"Overview — {selected_company}", "Executive stock summary")
+    overview_history = get_stock_data(ticker, "1y", "1d")
+    render_overview_metrics(security_info, overview_history)
+    st.markdown("#### Price performance")
+    with st.container(border=True):
+        price_chart(height=390, key="period_overview", selected_interval="1d", chart_type="Price")
 
-    # Authored research is deliberately separated from sourced company facts.
-    research_note_block()
-    st.markdown("<div style='height:18px;'></div>", unsafe_allow_html=True)
- 
-    # ---- Snapshot + key metrics ----
-    a, b = st.columns([1.15, 1])
-    with a:
-        company_card(info)
-    with b:
-        stat_grid("Key Metrics", fundamentals_pairs(info))
- 
-    st.markdown("<div style='height:6px;'></div>", unsafe_allow_html=True)
+    dcf_values = default_dcf_snapshot(security_info)
+    dcf_base = dcf_values.get("Base") if dcf_values else None
+    dcf_gap = (dcf_base / dcf_values["Current"] - 1) if dcf_base is not None and dcf_values.get("Current") else None
+    valuation_col, financial_col = st.columns(2)
+    with valuation_col:
+        stat_grid("Valuation Snapshot", [
+            ("P/E TTM", fmt_x(g(security_info, "trailingPE"), "x")),
+            ("Forward P/E", fmt_x(g(security_info, "forwardPE"), "x")),
+            ("EV / EBITDA", fmt_x(g(security_info, "enterpriseToEbitda"), "x")),
+            ("Base DCF Value", format_price(dcf_base)),
+            ("DCF Upside / Downside", percent_value(dcf_gap, signed=True)),
+        ])
+    with financial_col:
+        stat_grid("Financial Snapshot", [
+            ("Revenue TTM", value_or_unavailable(g(security_info, "totalRevenue"), fmt_big)),
+            ("Revenue Growth", percent_value(g(security_info, "revenueGrowth"))),
+            ("Operating Margin", percent_value(g(security_info, "operatingMargins"))),
+            ("Net Income TTM", value_or_unavailable(g(security_info, "netIncomeToCommon"), fmt_big)),
+            ("Free Cash Flow TTM", value_or_unavailable(g(security_info, "freeCashflow"), fmt_big)),
+        ])
+    research_note_block(compact=True)
+
+elif page == "Price & Chart":
+    page_head(f"Price & Chart — {selected_company}", "Detailed market history and technical context")
+    c1, c2 = st.columns(2)
+    with c1:
+        interval = st.selectbox("Chart interval", ["1d", "1wk", "1mo"], key="price_chart_interval")
+    with c2:
+        chart_type = st.radio("Chart type", ["Candlestick", "Price"], horizontal=True, key="price_chart_type")
+    stat_grid("Trading Range", [
+        ("52-Week High", format_price(g(security_info, "fiftyTwoWeekHigh"))),
+        ("52-Week Low", format_price(g(security_info, "fiftyTwoWeekLow"))),
+        ("50-Day Average", format_price(g(security_info, "fiftyDayAverage"))),
+        ("200-Day Average", format_price(g(security_info, "twoHundredDayAverage"))),
+    ])
     with st.container(border=True):
-        price_chart(height=420, key="period_company")
- 
-elif page == "Financials":
-    page_head(f"Financials — {selected_company}", "Revenue, net income, and operating cash flow")
-    financials_chart()
-    st.markdown("<div style='height:8px;'></div>", unsafe_allow_html=True)
-    data = get_stock_data(ticker, "1y", interval)
-    if not data.empty:
-        data = data.reset_index()
-        st.markdown("<div style='font-size:17px;font-weight:800;color:#f8fafc;margin:6px 0;'>"
-                    "Recent Price History</div>", unsafe_allow_html=True)
-        history_table(data, limit=150)
-        st.markdown("<div style='height:8px;'></div>", unsafe_allow_html=True)
-        full = data[["Date", "Open", "High", "Low", "Close", "Volume"]].sort_values("Date", ascending=False)
-        st.download_button("⬇ Download price history (CSV)",
-                           full.to_csv(index=False).encode("utf-8"),
-                           file_name=f"{ticker}_history.csv", mime="text/csv")
- 
-elif page == "Valuation":
-    page_head(f"Valuation — {selected_company}", "Market multiples, editable DCF, and price history")
-    info = security_info
-    pairs = [
-        ("Market Cap", fmt_big(g(info, "marketCap"))),
-        ("Trailing P/E", fmt_x(g(info, "trailingPE"))),
-        ("Forward P/E", fmt_x(g(info, "forwardPE"))),
-        ("PEG Ratio", fmt_x(g(info, "pegRatio"))),
-        ("Price / Sales", fmt_x(g(info, "priceToSalesTrailing12Months"))),
-        ("Price / Book", fmt_x(g(info, "priceToBook"))),
-        ("EV / EBITDA", fmt_x(g(info, "enterpriseToEbitda"))),
-        ("52W High", format_price(g(info, "fiftyTwoWeekHigh"))),
-        ("52W Low", format_price(g(info, "fiftyTwoWeekLow"))),
-    ]
-    stat_grid(f"Valuation Multiples — {ticker}", pairs)
-    render_dcf_model(info)
-    st.markdown("<div style='height:6px;'></div>", unsafe_allow_html=True)
-    with st.container(border=True):
-        price_chart(height=420, key="period_val")
- 
-elif page == "Watchlist":
-    page_head("High-Upside Watchlist", "Higher-risk names with mid-to-long-term upside")
-    wl = comparison_df[comparison_df["Company"].isin(SLEEPER_STOCKS)]
-    cols = st.columns(len(SLEEPER_STOCKS))
-    for col, comp in zip(cols, SLEEPER_STOCKS):
-        r = comparison_df[comparison_df["Company"] == comp]
-        with col:
-            if not r.empty:
-                r = r.iloc[0]
-                price = f"${r['Current Price']:,.2f}" if pd.notna(r["Current Price"]) else "—"
-                y = r["1Y Return %"]
-                ycls = "pos" if (pd.notna(y) and y >= 0) else "neg"
-                ytxt = f"{y:+.1f}% · up to 1Y" if pd.notna(y) else "—"
-                st.markdown(
-                    f"""<div class="sum-card"><div class="label">{comp} · {r['Ticker']}</div>
-                    <div class="row"><div class="value">{price}</div></div>
-                    <div class="sub {ycls}">{ytxt} · {r['Risk Level']} risk</div></div>""",
-                    unsafe_allow_html=True,
-                )
-    st.markdown("<div style='height:14px;'></div>", unsafe_allow_html=True)
-    st.markdown(f"<div class='thesis-box'>{NOTES[selected_company]}</div>"
-                if selected_company in SLEEPER_STOCKS else
-                "<div class='small-muted'>Select Rocket Lab, SoFi, or AST SpaceMobile in the sidebar to read its thesis.</div>",
-                unsafe_allow_html=True)
-    st.markdown("<div style='height:14px;'></div>", unsafe_allow_html=True)
-    page_head("Full Universe", "")
-    styled_comparison(comparison_df)
-    st.download_button("⬇ Download universe (CSV)", comparison_df.to_csv(index=False).encode("utf-8"),
-                       file_name="equity_universe.csv", mime="text/csv")
- 
+        price_data = price_chart(height=430, key="period_price", selected_interval=interval, chart_type=chart_type, show_volume=True)
+    if price_data is not None and not price_data.empty:
+        st.markdown("#### Daily price history")
+        history_table(price_data, limit=200)
+        export = price_data[["Date", "Open", "High", "Low", "Close", "Volume"]].sort_values("Date", ascending=False)
+        st.download_button("Download price history (CSV)", export.to_csv(index=False).encode("utf-8"), file_name=f"{ticker}_price_history.csv", mime="text/csv")
+
+elif page == "Financial Statements":
+    page_head(f"Financial Statements — {selected_company}", "Reported income statement, balance sheet and cash flow history")
+    render_financial_statements()
+
+elif page == "Company Analysis":
+    page_head(f"Company Analysis — {selected_company}", "Fundamentals and clearly labeled research interpretation")
+    render_company_analysis(security_info)
+
+elif page == "Research Universe":
+    page_head("Research Universe", "Screen and review the full 19-company coverage list")
+    comparison_df, _ = get_market_data(COMPANIES)
+    render_research_universe(comparison_df)
+
 elif page == "Research Notes":
-    page_head("Research Notes", "Authored investment theses across the coverage universe")
+    page_head("Research Notes", "Garrett Ewy’s personal investment theses, separated from sourced facts")
     research_note_block()
-    st.markdown("<div style='height:14px;'></div>", unsafe_allow_html=True)
     with st.expander(f"View all {len(COMPANIES)} research notes"):
         for comp in COMPANIES:
             st.markdown(f"**{comp}** — {CATEGORIES[comp]} · {RISK_LEVELS[comp]} risk")
             st.markdown(f"<div class='small-muted' style='margin-bottom:12px;'>{NOTES[comp]}</div>",
                         unsafe_allow_html=True)
 
+elif page == "DCF Model":
+    page_head(f"DCF Model — {selected_company}", "Editable scenario valuation with forecast, sensitivity and reverse DCF")
+    render_dcf_model(security_info)
+
+elif page == "Relative Valuation":
+    page_head(f"Relative Valuation — {selected_company}", "Trading multiples and relevant peer context")
+    render_relative_valuation(security_info)
+
+elif page == "Risk & Performance":
+    page_head(f"Risk & Performance — {selected_company}", "Historical return, volatility and drawdown analysis")
+    render_risk_performance(security_info)
+
+elif page == "Peer Comparison":
+    page_head(f"Peer Comparison — {selected_company}", "Focused comparison against a small relevant peer set")
+    render_peer_comparison()
+
+elif page == "Monte Carlo — Coming Soon":
+    page_head("Monte Carlo", "Coming Soon")
+    st.markdown(
+        """<div class="panel" style="min-height:260px;display:flex;flex-direction:column;justify-content:center;align-items:flex-start;">
+        <div class="eyebrow">FUTURE MODULE</div><h3 style="margin:.45rem 0;">Coming Soon</h3>
+        <p class="small-muted">Future quantitative module for probabilistic price simulations and risk analysis.</p>
+        </div>""",
+        unsafe_allow_html=True,
+    )
+
+elif page == "Company Profile":
+    page_head(f"Company Profile — {selected_company}", "Provider-sourced company facts")
+    render_company_profile(security_info)
+
+elif page == "Sources & Methodology":
+    page_head("Sources & Methodology", "Data provenance, calculation definitions and model limitations")
+    data_tab, dcf_tab, quant_tab, limits_tab = st.tabs(["Data & Refresh", "DCF", "Multiples & Risk", "Limitations"])
+    with data_tab:
+        st.markdown(
+            """#### Provider and refresh
+- Market, company-profile and financial-statement data are fetched from **Yahoo Finance through the yfinance Python library**.
+- Price history is cached for 5 minutes, universe data for 10 minutes, and company fundamentals/statements for 15 minutes.
+- Quotes may be current, delayed or end-of-day depending on the exchange and Yahoo Finance feed. The security header shows the provider timestamp when available.
+- Annual and quarterly tabs display the provider’s reported statement periods. Missing lines are shown as unavailable or omitted; no figures are fabricated.
+
+#### TTM methodology
+TTM fields such as revenue, free cash flow and net income use provider-reported trailing values when available. The dashboard does not add annual and quarterly figures together or silently construct an alternate TTM series."""
+        )
+    with dcf_tab:
+        st.markdown(
+            """#### DCF methodology
+- **Revenue forecast:** the first-year growth assumption fades linearly toward the final forecast-year rate.
+- **FCFF-margin approach:** unlevered free cash flow is estimated from reported free cash flow plus after-tax interest, then forecast as a margin of revenue. This simplified model does not separately forecast EBIT, taxes, D&A, capital expenditure and working capital.
+- **WACC:** market-value equity and debt weights combine CAPM cost of equity with after-tax cost of debt. CAPM uses the live 10-year Treasury proxy, provider beta and a disclosed 4.5% equity-risk-premium assumption.
+- **Terminal value:** Gordon Growth Model using final-year FCFF, WACC and terminal growth. WACC must exceed terminal growth.
+- **Net debt:** total debt less cash is subtracted from enterprise value. For banks, an equity DCF is used because deposits and borrowings are operating inputs.
+- **Share count:** aggregate implied shares are preferred, followed by market cap ÷ price, then reported shares outstanding. This avoids treating a single listed share class as the whole company.
+
+Bear, Base and Bull cases are mechanical spreads around transparent defaults. They are estimates, not price targets or recommendations."""
+        )
+    with quant_tab:
+        st.markdown(
+            """#### Multiples
+Trailing and forward P/E, PEG, EV/EBITDA, Price/Sales and Price/Book are provider-reported. Price/FCF is calculated as market capitalization divided by positive provider-reported free cash flow; it is unavailable when FCF is non-positive or missing.
+
+#### Risk calculations
+- Volatility is the standard deviation of daily returns annualized by √252.
+- Maximum drawdown is the worst peak-to-trough percentage decline in the available five-year price series.
+- Sharpe ratio is annualized average daily return less the current 10-year Treasury proxy, divided by annualized volatility.
+- Downside volatility annualizes the standard deviation of negative daily returns.
+- Peer performance rebases each valid series to 100 at its first observation."""
+        )
+    with limits_tab:
+        st.markdown(
+            """#### Limitations
+Yahoo Finance fields can be delayed, revised, missing or defined differently across companies. Statement taxonomies vary by issuer. Historical returns do not predict future returns. DCF results are highly sensitive to growth, margins, discount rates and terminal assumptions; a single consolidated DCF is especially limited for conglomerates. Peer selections are a focused subset of this project’s coverage universe, not a complete industry set.
+
+This dashboard is an educational research project and does not provide investment advice."""
+        )
+
 elif page == "About":
-    page_head("About", "Project purpose and implementation")
+    page_head("About", "Project purpose and technology")
     st.markdown(
         """<div class="panel">
-        <h4>Equity Intelligence</h4>
-        <p class="small-muted">Equity Intelligence is an interactive equity-research platform designed
-        to combine market data, fundamental analysis, valuation and quantitative research tools in one
-        workflow. The current coverage universe contains 19 public companies.</p>
-        <p class="small-muted" style="margin-top:10px;">Built by <b>Garrett Ewy</b> using Python,
-        Streamlit, yfinance, Pandas and Plotly. Market and fundamental information is cached to improve
-        responsiveness and reduce unnecessary source requests.</p>
+        <h4>Equity Research Dashboard</h4>
+        <p class="small-muted">An interactive equity-research project combining market data, financial statement analysis, valuation and quantitative research tools.</p>
+        <p class="small-muted" style="margin-top:10px;">Built by <b>Garrett Ewy</b>.</p>
+        <p class="small-muted" style="margin-top:10px;">Technology: Python · Streamlit · Pandas · Plotly · yfinance</p>
         <p class="small-muted" style="margin-top:10px;color:#d6a85f;">Models and commentary are for
         educational and research purposes. They are estimates, not investment recommendations.</p>
         </div>""",
@@ -2094,7 +2629,7 @@ elif page == "About":
  
 st.divider()
 st.caption(
-    "Equity Intelligence · Built by Garrett Ewy · Market and fundamental data via Yahoo Finance. "
+    "Equity Research Dashboard · Built by Garrett Ewy · Market and fundamental data via Yahoo Finance. "
     "Educational research only; not investment advice."
 )
  
