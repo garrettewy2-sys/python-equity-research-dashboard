@@ -5,6 +5,15 @@ import yfinance as yf
 import pandas as pd
 import plotly.graph_objects as go
 
+from dcf_model import (
+    equity_scenario_assumptions,
+    estimate_defaults,
+    estimate_equity_dcf_defaults,
+    run_dcf,
+    run_equity_dcf,
+    scenario_assumptions,
+    solve_implied_year_one_growth,
+)
 from dashboard_utils import (
     debt_to_equity_ratio,
     dividend_yield_percent,
@@ -23,7 +32,7 @@ st.set_page_config(
     page_title="Python Equity Research Dashboard",
     page_icon="📈",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="auto",
 )
  
 # ---- Color tokens (used in Python logic / Plotly / SVG) ----
@@ -117,14 +126,14 @@ st.markdown(
     .stat .k { color:#94a3b8; font-size:11.5px; font-weight:600; text-transform:uppercase; letter-spacing:0.4px; }
     .stat .v { color:#f8fafc; font-size:18px; font-weight:800; margin-top:3px; }
 
-    /* ---------- DCF layout preview ---------- */
+    /* ---------- DCF model ---------- */
     .dcf-preview-head {
         display:flex; align-items:baseline; justify-content:space-between; gap:10px;
         margin:20px 0 10px 0; flex-wrap:wrap;
     }
     .dcf-preview-head .t { color:#f8fafc; font-size:20px; font-weight:800; }
     .dcf-preview-head .b {
-        color:#f59e0b; background:rgba(245,158,11,0.10); border:1px solid rgba(245,158,11,0.25);
+        color:#86efac; background:rgba(34,197,94,0.10); border:1px solid rgba(34,197,94,0.25);
         border-radius:999px; padding:4px 9px; font-size:11px; font-weight:700; letter-spacing:0.4px;
     }
     .dcf-result-grid { display:grid; grid-template-columns:repeat(4, 1fr); gap:12px; margin-bottom:12px; }
@@ -149,6 +158,13 @@ st.markdown(
     }
     .dcf-reverse .k { color:#94a3b8; font-size:11px; text-transform:uppercase; letter-spacing:0.45px; }
     .dcf-reverse .v { color:#f8fafc; font-size:18px; font-weight:800; margin-top:4px; }
+    .dcf-source {
+        display:flex; justify-content:space-between; gap:10px; align-items:center;
+        padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.06); font-size:13px;
+    }
+    .dcf-source:last-child { border-bottom:0; }
+    .dcf-source .k { color:#94a3b8; }
+    .dcf-source .v { color:#e5eefc; font-weight:700; text-align:right; }
  
     /* ---------- Watchlist table ---------- */
     .wl { width:100%; border-collapse:collapse; }
@@ -215,6 +231,9 @@ st.markdown(
     }
     .nav-hint .ic { color:#60a5fa; font-weight:800; margin-right:7px; }
     .nav-hint b { color:#cbd5e1; }
+
+    /* A second, phone-only section switcher prevents hidden navigation. */
+    .st-key-mobile_section_nav { display:none; }
  
     /* ---------- Buttons ---------- */
     .stButton button, .stDownloadButton button {
@@ -298,29 +317,72 @@ st.markdown(
     .thesis-lg { font-size:16px; line-height:1.7; padding:22px 26px; border-left-width:6px; }
  
     /* ---------- Mobile layout ---------- */
-    @media (max-width: 640px) {
-        /* Smaller sidebar so the right side fits; still starts open and is closeable */
+    @media (max-width: 768px) {
+        /* Use the sidebar as a real drawer instead of squeezing the page beside it. */
         section[data-testid="stSidebar"],
         section[data-testid="stSidebar"] > div:first-child,
         [data-testid="stSidebarContent"] {
-            width: 13.5rem !important; min-width: 13.5rem !important;
+            width: min(86vw, 20rem) !important; min-width: min(86vw, 20rem) !important;
         }
-        /* Compact nav + brand so labels fit the narrower sidebar */
+        /* Make Streamlit's easy-to-miss gray arrow look like a labeled control. */
+        [data-testid="stSidebarCollapsedControl"] {
+            top:0.65rem !important; left:0.65rem !important; z-index:1002 !important;
+            width:88px !important; min-width:88px !important; height:42px !important;
+            background:#2563eb !important; border:1px solid rgba(147,197,253,0.55) !important;
+            border-radius:10px !important; box-shadow:0 8px 24px rgba(37,99,235,0.35) !important;
+        }
+        [data-testid="stSidebarCollapsedControl"]::after {
+            content:"Menu"; color:#fff; font-size:13px; font-weight:800; margin-left:2px;
+        }
+        [data-testid="collapsedControl"] {
+            background:#2563eb !important; border:1px solid rgba(147,197,253,0.55) !important;
+            border-radius:10px !important; padding:8px 11px !important;
+            box-shadow:0 8px 24px rgba(37,99,235,0.35) !important;
+        }
+        [data-testid="collapsedControl"]::after {
+            content:"Menu"; color:#fff; font-size:13px; font-weight:800; margin-left:5px;
+        }
+        [data-testid="stSidebarCollapsedControl"] button {
+            width:auto !important; min-width:82px !important; height:42px !important;
+            padding:0 12px !important; border-radius:10px !important;
+            background:#2563eb !important; border:1px solid rgba(147,197,253,0.55) !important;
+            box-shadow:0 8px 24px rgba(37,99,235,0.35) !important;
+        }
+        [data-testid="stSidebarCollapsedControl"] button::after {
+            content:"Menu"; color:#fff; font-size:13px; font-weight:800; margin-left:5px;
+        }
+        [data-testid="stSidebarCollapseButton"] button {
+            background:rgba(59,130,246,0.18) !important; border-radius:10px !important;
+        }
+        /* Compact nav + brand inside the drawer. */
         [data-testid="stSidebar"] .sb-brand { padding: 10px 11px; }
         [data-testid="stSidebar"] .sb-brand .t { font-size: 13px; }
-        [data-testid="stSidebar"] div[role="radiogroup"] label { padding: 7px 9px; font-size: 13px; }
- 
-        .block-container { padding: 1.2rem 0.9rem 2rem 0.9rem; }
+        [data-testid="stSidebar"] div[role="radiogroup"] label { padding: 10px 11px; font-size: 13px; }
+
+        .block-container { padding: 0.9rem 0.8rem 5rem 1.5rem; }
+        .st-key-mobile_section_nav {
+            display:block; position:sticky; top:4rem; z-index:900;
+            background:rgba(7,17,31,0.96); border:1px solid rgba(96,165,250,0.34);
+            border-radius:14px; padding:10px 12px 12px; margin:0 0 14px 0;
+            box-shadow:0 10px 28px rgba(0,0,0,0.35); backdrop-filter:blur(10px);
+        }
+        .st-key-mobile_section_nav [data-testid="stMarkdownContainer"] p {
+            margin:0 0 4px 0; color:#93c5fd; font-size:11px; font-weight:800;
+            letter-spacing:0.7px; text-transform:uppercase;
+        }
+        .desktop-nav-hint { display:none; }
         /* Stack headers so title and subtitle never touch */
-        .page-head { flex-direction: column; align-items: flex-start; gap: 4px; margin-bottom: 14px; }
-        .page-head .title { font-size: 22px; }
+        .page-head { flex-direction: column; align-items: flex-start; gap: 4px; margin-bottom: 14px; padding-left:8px; }
+        .page-head .title { font-size: 20px; max-width:100%; overflow-wrap:anywhere; }
         .page-head .sub { font-size: 12.5px; }
         .top-head { flex-direction: column; align-items: flex-start; gap: 2px; }
-        .top-head .th-title { font-size: 22px; }
+        .top-head .th-title { font-size: 20px; max-width:100%; overflow-wrap:anywhere; line-height:1.2; }
+        .top-head .th-sub { padding-left:8px; }
         /* Denser grids for the narrower screen */
         .stat-grid { grid-template-columns: repeat(2, 1fr); }
         .dcf-result-grid { grid-template-columns: repeat(2, 1fr); }
         .dcf-assumption-grid { grid-template-columns: 1fr; }
+        .dcf-result .v { font-size:19px; }
         .qstats { gap: 16px; }
     }
     </style>
@@ -332,7 +394,7 @@ st.markdown(
 # DATA: companies, categories, risk, notes
 # =============================================================
 COMPANIES = {
-    "Apple": "AAPL", "Palantir": "PLTR", "Nvidia": "NVDA", "SpaceX": "SPCX",
+    "Apple": "AAPL", "Palantir": "PLTR", "Nvidia": "NVDA",
     "Tesla": "TSLA", "Microsoft": "MSFT", "Amazon": "AMZN", "Alphabet / Google": "GOOGL",
     "Meta": "META", "AMD": "AMD", "Broadcom": "AVGO", "JPMorgan Chase": "JPM",
     "Goldman Sachs": "GS", "Visa": "V", "Berkshire Hathaway": "BRK-B",
@@ -344,7 +406,7 @@ SLEEPER_STOCKS = ["Rocket Lab", "SoFi", "AST SpaceMobile"]
  
 CATEGORIES = {
     "Apple": "Big Tech", "Palantir": "AI / Data", "Nvidia": "AI / Semiconductors",
-    "SpaceX": "Space", "Tesla": "EV / Energy", "Microsoft": "Cloud / AI",
+    "Tesla": "EV / Energy", "Microsoft": "Cloud / AI",
     "Amazon": "E-commerce / Cloud", "Alphabet / Google": "Search / AI", "Meta": "Social / AI",
     "AMD": "Semiconductors", "Broadcom": "Semiconductors", "JPMorgan Chase": "Banking",
     "Goldman Sachs": "Investment Banking", "Visa": "Payments", "Berkshire Hathaway": "Conglomerate",
@@ -353,7 +415,7 @@ CATEGORIES = {
 }
  
 RISK_LEVELS = {
-    "Apple": "Lower", "Palantir": "High", "Nvidia": "Medium", "SpaceX": "High",
+    "Apple": "Lower", "Palantir": "High", "Nvidia": "Medium",
     "Tesla": "High", "Microsoft": "Lower", "Amazon": "Medium", "Alphabet / Google": "Lower",
     "Meta": "Medium", "AMD": "High", "Broadcom": "Medium", "JPMorgan Chase": "Lower",
     "Goldman Sachs": "Medium", "Visa": "Lower", "Berkshire Hathaway": "Lower",
@@ -365,7 +427,6 @@ NOTES = {
     "Apple": "Apple is one of the biggest consumer technology companies in the world, best known for creating the iPhone, Mac, and iPad. I like Apple because it has a loyal customer base, recurring revenue from services, consistent cash flow, and strong brand power. The main risk is that growth could slow if iPhone demand weakens or if Apple struggles to stay competitive in AI features and new product categories.",
     "Palantir": "Palantir is a software company that helps governments and businesses organize data, use AI, and make better decisions. I like Palantir because it has strong exposure to artificial intelligence, defense, and commercial software growth. The main risk is that the stock can trade at a high valuation, so the company has to keep growing fast to meet investor expectations.",
     "Nvidia": "Nvidia is one of the world's largest semiconductor companies, best known for creating GPUs used in gaming, data centers, and, most importantly, artificial intelligence. I like Nvidia because it is one of the main companies benefiting from the growth of AI infrastructure and cloud computing. The main risk is that the stock already has high expectations built in, so any slowdown in AI demand could hurt the valuation.",
-    "SpaceX": "SpaceX is a space company focused on rocket launches, Starlink satellite internet, and long-term space infrastructure. I like SpaceX because it has strong exposure to the growing space economy, satellite internet, and government space contracts. The main risk is that space is extremely expensive and technical, so the company needs strong execution over a long period of time.",
     "Tesla": "Tesla is an electric vehicle and energy company focused on EVs, batteries, charging, energy storage, and autonomous driving. I like Tesla because it has a strong brand and could benefit if electric vehicles, energy storage, and self-driving technology continue to grow. The main risk is that EV competition is increasing and the stock often trades based on aggressive future expectations.",
     "Microsoft": "Microsoft is one of the largest technology companies in the world, with businesses in software, cloud computing, gaming, cybersecurity, and artificial intelligence. I like Microsoft because it has recurring revenue, strong enterprise customers, and major exposure to AI through Azure and its software products. The main risk is that growth could slow if cloud demand weakens or if AI spending does not turn into strong profits.",
     "Amazon": "Amazon is a massive technology company best known for e-commerce, AWS cloud computing, advertising, logistics, and digital services. I like Amazon because AWS and advertising are high-margin businesses that could keep driving long-term earnings growth. The main risk is that the retail side of the business can have thin margins and Amazon faces strong competition in multiple industries.",
@@ -450,6 +511,20 @@ def get_index_series(symbol):
     except Exception:
         logger.exception("Could not load index data for %s", symbol)
         return None, None, []
+
+
+@st.cache_data(ttl=3600)
+def get_risk_free_rate():
+    """Use the live 10-year Treasury yield proxy, with a documented fallback."""
+    try:
+        history = yf.Ticker("^TNX").history(period="5d", interval="1d")
+        if not history.empty:
+            rate = float(history["Close"].dropna().iloc[-1]) / 100.0
+            if 0.0 < rate < 0.15:
+                return rate
+    except Exception:
+        logger.exception("Could not load the 10-year Treasury yield")
+    return 0.0425
  
  
 @st.cache_data(ttl=900)
@@ -491,6 +566,110 @@ def get_financials(symbol):
     except Exception:
         logger.exception("Could not load financial statements for %s", symbol)
         out["error"] = "Financial statement data could not be loaded."
+    return out
+
+
+@st.cache_data(ttl=900)
+def get_dcf_financials(symbol):
+    """Load annual statement inputs needed for a company-specific FCFF DCF."""
+    out = {"history": [], "cash": None, "debt": None, "error": None}
+    try:
+        company = yf.Ticker(symbol)
+        income = getattr(company, "income_stmt", None)
+        if income is None or income.empty:
+            income = company.financials
+        cash_flow = getattr(company, "cashflow", None)
+        balance = getattr(company, "balance_sheet", None)
+        if income is None or income.empty:
+            out["error"] = "Annual income-statement data is unavailable."
+            return out
+
+        periods = list(income.columns)[:4][::-1]
+        for period in periods:
+            revenue = statement_value(
+                income,
+                ["Total Revenue", "Operating Revenue"],
+                period,
+            )
+            net_income = statement_value(
+                income,
+                ["Net Income", "Net Income Common Stockholders"],
+                period,
+            )
+            book_equity = statement_value(
+                balance,
+                ["Stockholders Equity", "Common Stock Equity", "Total Equity Gross Minority Interest"],
+                period,
+            )
+            pretax_income = statement_value(
+                income,
+                ["Pretax Income", "Income Before Tax"],
+                period,
+            )
+            tax_provision = statement_value(income, ["Tax Provision"], period)
+            interest = statement_value(
+                income,
+                ["Interest Expense", "Interest Expense Non Operating"],
+                period,
+            )
+            operating_cash_flow = statement_value(
+                cash_flow,
+                ["Operating Cash Flow", "Total Cash From Operating Activities"],
+                period,
+            )
+            capital_expenditure = statement_value(
+                cash_flow,
+                ["Capital Expenditure", "Capital Expenditures"],
+                period,
+            )
+            reported_fcf = statement_value(cash_flow, ["Free Cash Flow"], period)
+
+            if pretax_income and pretax_income > 0 and tax_provision is not None:
+                tax_rate = max(0.0, min(0.35, tax_provision / pretax_income))
+            else:
+                tax_rate = 0.21
+
+            levered_fcf = reported_fcf
+            if levered_fcf is None and operating_cash_flow is not None:
+                levered_fcf = operating_cash_flow - abs(capital_expenditure or 0.0)
+            fcff = None
+            if levered_fcf is not None:
+                fcff = levered_fcf + abs(interest or 0.0) * (1.0 - tax_rate)
+
+            if revenue is None and fcff is None and net_income is None:
+                continue
+            year = period.year if hasattr(period, "year") else str(period)
+            out["history"].append(
+                {
+                    "year": str(year),
+                    "revenue": revenue,
+                    "fcff": fcff,
+                    "net_income": net_income,
+                    "book_equity": book_equity,
+                    "interest": interest,
+                    "tax_rate": tax_rate,
+                }
+            )
+
+        if balance is not None and not balance.empty:
+            latest_period = balance.columns[0]
+            out["cash"] = statement_value(
+                balance,
+                [
+                    "Cash Cash Equivalents And Short Term Investments",
+                    "Cash And Cash Equivalents",
+                    "Cash Financial",
+                ],
+                latest_period,
+            )
+            out["debt"] = statement_value(
+                balance,
+                ["Total Debt", "Total Non Current Liabilities Net Minority Interest"],
+                latest_period,
+            )
+    except Exception:
+        logger.exception("Could not load DCF financials for %s", symbol)
+        out["error"] = "The reported financial inputs needed for a DCF could not be loaded."
     return out
  
  
@@ -570,19 +749,42 @@ PAGES = [
     "🏠  Overview", "📊  Company Analysis", "📈  Financials", "💲  Valuation",
     "⭐  Watchlist", "📓  Notebook", "⚙️  Settings",
 ]
+
+
+def sync_sidebar_navigation():
+    st.session_state["active_page"] = st.session_state["sidebar_navigation"]
+    st.session_state["mobile_navigation"] = st.session_state["sidebar_navigation"]
+
+
+def sync_mobile_navigation():
+    st.session_state["active_page"] = st.session_state["mobile_navigation"]
+    st.session_state["sidebar_navigation"] = st.session_state["mobile_navigation"]
+
+
+st.session_state.setdefault("active_page", PAGES[0])
+st.session_state.setdefault("sidebar_navigation", st.session_state["active_page"])
+st.session_state.setdefault("mobile_navigation", st.session_state["active_page"])
+
 st.sidebar.markdown(
     f"<div class='nav-title'><span class='dot'>●</span> Menu</div>"
     f"<div class='nav-cap'>{len(PAGES)} sections · tap one to explore ↓</div>",
     unsafe_allow_html=True,
 )
-nav = st.sidebar.radio("Navigation", PAGES, label_visibility="collapsed")
+nav = st.sidebar.radio(
+    "Navigation",
+    PAGES,
+    label_visibility="collapsed",
+    key="sidebar_navigation",
+    on_change=sync_sidebar_navigation,
+)
  
 st.sidebar.divider()
 st.sidebar.caption("Data via yfinance · Educational use only · Not financial advice.")
  
-# ---- Shared data ----
-comparison_df, basket = get_market_data(COMPANIES)
-sp_last, sp_chg, sp_series = get_index_series("^GSPC")
+# Heavy universe data is loaded later, only on pages that use it.
+comparison_df = pd.DataFrame()
+basket = []
+sp_last, sp_chg, sp_series = None, None, []
  
  
 # =============================================================
@@ -619,7 +821,7 @@ def summary_cards():
     c1, c2, c3, c4 = st.columns(4)
     with c1:
         st.markdown(
-            f"""<div class="sum-card"><div class="label">20-Stock Basket · Up to 1Y</div>
+            f"""<div class="sum-card"><div class="label">{len(COMPANIES)}-Stock Basket · Up to 1Y</div>
             <div class="row"><div class="value">{b_val}</div>{b_spark}</div>
             <div class="sub {b_cls}">{b_arrow} Equal-weight daily returns</div></div>""",
             unsafe_allow_html=True,
@@ -812,43 +1014,369 @@ def financials_chart():
         st.plotly_chart(fig, width="stretch", config={"displayModeBar": False})
 
 
-def render_dcf_preview(info):
-    """Render a clearly labeled, illustrative DCF layout for design review."""
+def render_bank_equity_dcf(info, statement_data):
+    """Render a bank-appropriate FCFE valuation instead of misusing net debt."""
+    history = [
+        row for row in statement_data["history"]
+        if row.get("net_income") is not None and row.get("book_equity") is not None
+    ]
     current_price = g(info, "currentPrice") or g(info, "regularMarketPrice")
-    current_price = float(current_price) if current_price is not None else 100.0
+    shares = g(info, "sharesOutstanding") or g(info, "impliedSharesOutstanding")
+    market_cap = g(info, "marketCap")
+    if shares is None and market_cap and current_price:
+        shares = market_cap / current_price
+    if not history or history[-1]["net_income"] <= 0 or not current_price or not shares:
+        st.error("Positive earnings, common equity, price, and share-count data are required for this bank equity DCF.")
+        return
 
-    scenarios = {
-        "Bear": {"growth": 5.0, "margin": 26.0, "tax": 18.0, "wacc": 9.5, "terminal": 2.0, "value": 0.74},
-        "Base": {"growth": 8.0, "margin": 30.0, "tax": 16.0, "wacc": 8.5, "terminal": 2.5, "value": 0.88},
-        "Bull": {"growth": 11.0, "margin": 32.0, "tax": 15.0, "wacc": 7.8, "terminal": 3.0, "value": 1.04},
+    defaults = estimate_equity_dcf_defaults(history, info)
+    scenario_name = st.radio(
+        "Scenario",
+        ["Bear", "Base", "Bull"],
+        index=1,
+        horizontal=True,
+        key=f"bank_dcf_scenario_{ticker}",
+    )
+    scenario = equity_scenario_assumptions(defaults, scenario_name)
+
+    with st.expander("Edit bank equity DCF assumptions", expanded=True):
+        input_1, input_2, input_3 = st.columns(3)
+        with input_1:
+            year_one_growth = st.number_input(
+                "Year 1 earnings growth (%)", -30.0, 60.0,
+                round(scenario["year_one_growth"] * 100, 1), 0.5,
+                key=f"bank_growth_1_{ticker}_{scenario_name}",
+            ) / 100
+            final_year_growth = st.number_input(
+                "Final-year earnings growth (%)", -10.0, 25.0,
+                round(scenario["final_year_growth"] * 100, 1), 0.5,
+                key=f"bank_growth_final_{ticker}_{scenario_name}",
+            ) / 100
+        with input_2:
+            target_roe = st.number_input(
+                "Target ROE (%)", 3.0, 45.0,
+                round(scenario["target_roe"] * 100, 1), 0.5,
+                key=f"bank_roe_{ticker}_{scenario_name}",
+            ) / 100
+            cost_of_equity = st.number_input(
+                "Cost of equity (%)", 5.0, 22.0,
+                round(scenario["cost_of_equity"] * 100, 1), 0.25,
+                key=f"bank_cost_equity_{ticker}_{scenario_name}",
+            ) / 100
+        with input_3:
+            terminal_growth = st.number_input(
+                "Terminal growth (%)", 0.0, 5.0,
+                round(scenario["terminal_growth"] * 100, 1), 0.25,
+                key=f"bank_terminal_{ticker}_{scenario_name}",
+            ) / 100
+            forecast_years = st.slider(
+                "Forecast period (years)", 5, 10, int(scenario["forecast_years"]),
+                key=f"bank_years_{ticker}_{scenario_name}",
+            )
+
+        source_tiles = [
+            ("Reported net income", fmt_big(history[-1]["net_income"])),
+            ("Common equity", fmt_big(history[-1]["book_equity"])),
+            ("Starting ROE", f"{defaults['starting_roe']:.1%}"),
+            ("Shares outstanding", f"{float(shares) / 1e9:,.2f}B"),
+        ]
+        source_html = "".join(
+            f"<div class='dcf-assumption'><div class='k'>{label}</div><div class='v'>{value}</div></div>"
+            for label, value in source_tiles
+        )
+        st.markdown(f"<div class='dcf-assumption-grid'>{source_html}</div>", unsafe_allow_html=True)
+
+    model_inputs = {
+        "base_net_income": float(history[-1]["net_income"]),
+        "starting_roe": defaults["starting_roe"],
+        "year_one_growth": year_one_growth,
+        "final_year_growth": final_year_growth,
+        "target_roe": target_roe,
+        "cost_of_equity": cost_of_equity,
+        "terminal_growth": terminal_growth,
+        "forecast_years": forecast_years,
+        "shares_outstanding": float(shares),
     }
+    try:
+        result = run_equity_dcf(**model_inputs)
+    except ValueError as error:
+        st.error(str(error))
+        return
 
+    fair_value = result["value_per_share"]
+    upside = (fair_value / float(current_price) - 1.0) * 100.0
+    default_values = []
+    for name in ["Bear", "Base", "Bull"]:
+        assumptions = equity_scenario_assumptions(defaults, name)
+        try:
+            default_values.append(run_equity_dcf(
+                base_net_income=float(history[-1]["net_income"]),
+                starting_roe=defaults["starting_roe"],
+                year_one_growth=assumptions["year_one_growth"],
+                final_year_growth=assumptions["final_year_growth"],
+                target_roe=assumptions["target_roe"],
+                cost_of_equity=assumptions["cost_of_equity"],
+                terminal_growth=assumptions["terminal_growth"],
+                forecast_years=assumptions["forecast_years"],
+                shares_outstanding=float(shares),
+            )["value_per_share"])
+        except ValueError:
+            pass
+    range_text = f"{format_price(min(default_values))}–{format_price(max(default_values))}" if default_values else "—"
+    result_tiles = [
+        ("Current Price", format_price(current_price), ""),
+        (f"{scenario_name} Equity DCF", format_price(fair_value), ""),
+        ("Upside / Downside", f"{upside:+.1f}%", "pos" if upside >= 0 else "neg"),
+        ("Default Scenario Range", range_text, ""),
+    ]
+    result_html = "".join(
+        f"<div class='dcf-result'><div class='k'>{label}</div><div class='v {css}'>{value}</div></div>"
+        for label, value, css in result_tiles
+    )
+    st.markdown(f"<div class='dcf-result-grid'>{result_html}</div>", unsafe_allow_html=True)
+    if result["terminal_value_share"] > 0.80:
+        st.info(f"{result['terminal_value_share']:.0%} of equity value comes from the terminal value. Treat the result as assumption-sensitive.")
+
+    forecast_tab, sensitivity_tab, method_tab = st.tabs(["Forecast", "Sensitivity", "Sources & Method"])
+    with forecast_tab:
+        first_year = pd.Timestamp.now().year + 1
+        rows = [{
+            "Year": first_year + row["year"] - 1,
+            "Growth": row["growth"], "ROE": row["roe"], "Payout": row["payout"],
+            "Net Income": row["earnings"], "FCFE": row["fcfe"], "PV of FCFE": row["pv_fcfe"],
+        } for row in result["schedule"]]
+        forecast_df = pd.DataFrame(rows)
+        chart = go.Figure()
+        chart.add_trace(go.Bar(x=forecast_df["Year"], y=forecast_df["Net Income"] / 1e9, name="Net income", marker_color=BLUE))
+        chart.add_trace(go.Scatter(x=forecast_df["Year"], y=forecast_df["FCFE"] / 1e9, name="FCFE", mode="lines+markers", line=dict(color=PURPLE, width=3)))
+        chart.update_layout(
+            template="plotly_dark", height=310, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+            font=dict(color=TEXT, family="Inter"), margin=dict(l=10, r=10, t=28, b=10),
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0), yaxis_title="$ billions",
+        )
+        chart.update_xaxes(gridcolor="rgba(255,255,255,0.05)")
+        chart.update_yaxes(gridcolor="rgba(255,255,255,0.05)")
+        st.plotly_chart(chart, width="stretch", config={"displayModeBar": False})
+        display_df = forecast_df.copy()
+        for column in ["Growth", "ROE", "Payout"]:
+            display_df[column] = display_df[column].map(lambda value: f"{value:.1%}")
+        for column in ["Net Income", "FCFE", "PV of FCFE"]:
+            display_df[column] = display_df[column].map(lambda value: f"${value / 1e9:,.1f}B")
+        st.dataframe(display_df, hide_index=True, width="stretch")
+
+    with sensitivity_tab:
+        cost_values = [cost_of_equity + offset for offset in [-0.01, -0.005, 0.0, 0.005, 0.01]]
+        growth_values = [max(0.0, terminal_growth + offset) for offset in [-0.01, -0.005, 0.0, 0.005, 0.01]]
+        matrix = []
+        for test_cost in cost_values:
+            row_values = []
+            for test_growth in growth_values:
+                row_values.append(None if test_cost <= test_growth else run_equity_dcf(**{
+                    **model_inputs, "cost_of_equity": test_cost, "terminal_growth": test_growth,
+                })["value_per_share"])
+            matrix.append(row_values)
+        heatmap = go.Figure(go.Heatmap(
+            z=matrix, x=[f"g {value:.1%}" for value in growth_values],
+            y=[f"Ke {value:.1%}" for value in cost_values],
+            colorscale=[[0, "#7f1d1d"], [0.5, "#1d4ed8"], [1, "#166534"]],
+            text=[[format_price(value) if value is not None else "—" for value in row] for row in matrix],
+            texttemplate="%{text}", showscale=False,
+        ))
+        heatmap.update_layout(
+            template="plotly_dark", height=330, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+            font=dict(color=TEXT, family="Inter"), margin=dict(l=10, r=10, t=25, b=10),
+        )
+        st.plotly_chart(heatmap, width="stretch", config={"displayModeBar": False})
+
+    with method_tab:
+        st.markdown(
+            "#### Why this model is different\n"
+            "For a bank, deposits and borrowings are operating inputs, so subtracting net debt as if it were an industrial company is misleading. "
+            "This model forecasts earnings, estimates the capital that must be retained from growth and ROE, and discounts the remaining cash flow to equity at the cost of equity."
+        )
+        history_df = pd.DataFrame(history)[["year", "net_income", "book_equity"]].rename(columns={
+            "year": "Year", "net_income": "Net Income", "book_equity": "Common Equity",
+        })
+        for column in ["Net Income", "Common Equity"]:
+            history_df[column] = history_df[column].map(fmt_big)
+        st.dataframe(history_df, hide_index=True, width="stretch")
+
+
+def render_dcf_model(info):
+    """Render an editable, company-specific two-stage FCFF valuation."""
+    statement_data = get_dcf_financials(ticker)
+    model_info = {**info, "_risk_free_rate": get_risk_free_rate()}
     st.markdown(
         """<div class="dcf-preview-head">
-        <div class="t">Intrinsic Value — DCF Layout Preview</div>
-        <div class="b">DRAFT 1 · ILLUSTRATIVE VALUES ONLY</div>
+        <div class="t">Intrinsic Value — Discounted Cash Flow</div>
+        <div class="b">ACTIVE MODEL · EDITABLE</div>
         </div>""",
         unsafe_allow_html=True,
     )
 
+    financial_firms = {"JPM", "GS", "SOFI"}
+    if ticker in financial_firms:
+        st.caption("Bank equity DCF using free cash flow to equity. Assumptions are estimates, not facts.")
+        st.warning(
+            "Banks need an equity DCF: deposits and borrowings are operating inputs, so the industrial-company net-debt method would be misleading."
+        )
+        render_bank_equity_dcf(model_info, statement_data)
+        return
+
+    st.caption("Two-stage unlevered free-cash-flow model using reported annual financials. Assumptions are estimates, not facts.")
+    history = [
+        row for row in statement_data["history"]
+        if row.get("revenue") is not None and row.get("fcff") is not None
+    ]
+    if not history:
+        st.error(statement_data.get("error") or "Reported cash-flow data is unavailable, so a defensible DCF cannot be calculated.")
+        return
+
+    current_price = g(info, "currentPrice") or g(info, "regularMarketPrice")
+    shares = g(info, "sharesOutstanding") or g(info, "impliedSharesOutstanding")
+    market_cap = g(info, "marketCap")
+    if shares is None and market_cap and current_price:
+        shares = market_cap / current_price
+    if not current_price or not shares:
+        st.error("Current price or share-count data is unavailable, so per-share DCF value cannot be calculated.")
+        return
+
+    cash = g(info, "totalCash")
+    debt = g(info, "totalDebt")
+    cash = float(cash if cash is not None else statement_data.get("cash") or 0.0)
+    debt = float(debt if debt is not None else statement_data.get("debt") or 0.0)
+    net_debt = debt - cash
+    base_revenue = float(history[-1]["revenue"])
+    defaults = estimate_defaults(history, model_info)
+
+    if ticker == "BRK-B":
+        st.warning("Berkshire is a conglomerate with large insurance operations; a sum-of-the-parts valuation is more reliable than one consolidated DCF.")
+    elif defaults["starting_fcff_margin"] < 0:
+        st.warning("This company currently has negative FCFF. Its value is highly sensitive to the assumed path to positive margins.")
+
     scenario_name = st.radio(
-        "DCF preview scenario",
-        list(scenarios),
+        "Scenario",
+        ["Bear", "Base", "Bull"],
         index=1,
         horizontal=True,
-        key=f"dcf_preview_scenario_{ticker}",
+        key=f"dcf_scenario_{ticker}",
     )
-    assumptions = scenarios[scenario_name]
-    fair_value = current_price * assumptions["value"]
-    upside = (fair_value / current_price - 1.0) * 100.0
+    scenario = scenario_assumptions(defaults, scenario_name)
+
+    with st.expander("Edit DCF assumptions", expanded=True):
+        input_1, input_2, input_3 = st.columns(3)
+        with input_1:
+            year_one_growth = st.number_input(
+                "Year 1 revenue growth (%)",
+                min_value=-30.0,
+                max_value=80.0,
+                value=round(scenario["year_one_growth"] * 100, 1),
+                step=0.5,
+                key=f"dcf_y1_growth_{ticker}_{scenario_name}",
+            ) / 100
+            final_year_growth = st.number_input(
+                "Final-year revenue growth (%)",
+                min_value=-10.0,
+                max_value=30.0,
+                value=round(scenario["final_year_growth"] * 100, 1),
+                step=0.5,
+                key=f"dcf_final_growth_{ticker}_{scenario_name}",
+            ) / 100
+        with input_2:
+            target_margin = st.number_input(
+                "Target FCFF margin (%)",
+                min_value=-20.0,
+                max_value=50.0,
+                value=round(scenario["target_fcff_margin"] * 100, 1),
+                step=0.5,
+                key=f"dcf_margin_{ticker}_{scenario_name}",
+            ) / 100
+            wacc = st.number_input(
+                "WACC (%)",
+                min_value=4.0,
+                max_value=20.0,
+                value=round(scenario["wacc"] * 100, 1),
+                step=0.25,
+                key=f"dcf_wacc_{ticker}_{scenario_name}",
+            ) / 100
+        with input_3:
+            terminal_growth = st.number_input(
+                "Terminal growth (%)",
+                min_value=0.0,
+                max_value=5.0,
+                value=round(scenario["terminal_growth"] * 100, 1),
+                step=0.25,
+                key=f"dcf_terminal_{ticker}_{scenario_name}",
+            ) / 100
+            forecast_years = st.slider(
+                "Forecast period (years)",
+                min_value=5,
+                max_value=10,
+                value=int(scenario["forecast_years"]),
+                key=f"dcf_years_{ticker}_{scenario_name}",
+            )
+
+        source_tiles = [
+            ("Reported revenue", fmt_big(base_revenue)),
+            ("Starting FCFF margin", f"{defaults['starting_fcff_margin'] * 100:.1f}%"),
+            ("Net cash" if net_debt < 0 else "Net debt", fmt_big(abs(net_debt))),
+            ("Shares outstanding", f"{float(shares) / 1e9:,.2f}B"),
+        ]
+        tile_html = "".join(
+            f"<div class='dcf-assumption'><div class='k'>{label}</div><div class='v'>{value}</div></div>"
+            for label, value in source_tiles
+        )
+        st.markdown(f"<div class='dcf-assumption-grid'>{tile_html}</div>", unsafe_allow_html=True)
+
+    model_inputs = {
+        "base_revenue": base_revenue,
+        "starting_fcff_margin": defaults["starting_fcff_margin"],
+        "year_one_growth": year_one_growth,
+        "final_year_growth": final_year_growth,
+        "target_fcff_margin": target_margin,
+        "wacc": wacc,
+        "terminal_growth": terminal_growth,
+        "forecast_years": forecast_years,
+        "net_debt": net_debt,
+        "shares_outstanding": float(shares),
+    }
+
+    try:
+        result = run_dcf(**model_inputs)
+    except ValueError as error:
+        st.error(str(error))
+        return
+
+    fair_value = result["value_per_share"]
+    upside = (fair_value / float(current_price) - 1.0) * 100.0
     upside_class = "pos" if upside >= 0 else "neg"
-    range_low, range_high = current_price * 0.74, current_price * 1.04
+    default_values = []
+    for name in ["Bear", "Base", "Bull"]:
+        assumptions = scenario_assumptions(defaults, name)
+        try:
+            default_values.append(run_dcf(
+                base_revenue=base_revenue,
+                starting_fcff_margin=defaults["starting_fcff_margin"],
+                year_one_growth=assumptions["year_one_growth"],
+                final_year_growth=assumptions["final_year_growth"],
+                target_fcff_margin=assumptions["target_fcff_margin"],
+                wacc=assumptions["wacc"],
+                terminal_growth=assumptions["terminal_growth"],
+                forecast_years=assumptions["forecast_years"],
+                net_debt=net_debt,
+                shares_outstanding=float(shares),
+            )["value_per_share"])
+        except ValueError:
+            pass
+    range_text = "—"
+    if default_values:
+        range_text = f"{format_price(min(default_values))}–{format_price(max(default_values))}"
 
     result_tiles = [
         ("Current Price", format_price(current_price), ""),
-        (f"{scenario_name} Fair Value", format_price(fair_value), ""),
+        (f"{scenario_name} DCF Value", format_price(fair_value), ""),
         ("Upside / Downside", f"{upside:+.1f}%", upside_class),
-        ("Illustrative Range", f"{format_price(range_low)}–{format_price(range_high)}", ""),
+        ("Default Scenario Range", range_text, ""),
     ]
     result_html = "".join(
         f"<div class='dcf-result'><div class='k'>{label}</div><div class='v {css}'>{value}</div></div>"
@@ -856,114 +1384,138 @@ def render_dcf_preview(info):
     )
     st.markdown(f"<div class='dcf-result-grid'>{result_html}</div>", unsafe_allow_html=True)
 
-    left, right = st.columns([0.82, 1.55])
-    with left:
-        with st.container(border=True):
-            st.markdown("#### Assumptions")
-            assumption_tiles = [
-                ("Year 1 growth", f"{assumptions['growth']:.1f}%"),
-                ("Target EBIT margin", f"{assumptions['margin']:.1f}%"),
-                ("Tax rate", f"{assumptions['tax']:.1f}%"),
-                ("WACC", f"{assumptions['wacc']:.1f}%"),
-                ("Terminal growth", f"{assumptions['terminal']:.1f}%"),
-                ("Forecast period", "5 years"),
-            ]
-            assumption_html = "".join(
-                f"<div class='dcf-assumption'><div class='k'>{label}</div><div class='v'>{value}</div></div>"
-                for label, value in assumption_tiles
-            )
-            st.markdown(f"<div class='dcf-assumption-grid'>{assumption_html}</div>", unsafe_allow_html=True)
-            st.markdown(
-                "<div class='dcf-mini-note'>In the implemented model these become editable, source-labeled inputs. "
-                "They are locked in this preview because no real DCF calculation is running yet.</div>",
-                unsafe_allow_html=True,
-            )
+    if result["present_value_fcff"] < 0:
+        st.warning("Forecast-period FCFF remains negative, so the valuation depends entirely on later profitability and terminal value.")
+    elif result["terminal_value_share"] > 0.80:
+        st.info(f"{result['terminal_value_share']:.0%} of enterprise value comes from the terminal value. Treat the result as assumption-sensitive.")
 
-    with right:
-        with st.container(border=True):
-            st.markdown("#### Revenue and Free Cash Flow Forecast")
-            base_revenue = g(info, "totalRevenue") or 100_000_000_000
-            revenue = float(base_revenue)
-            forecast_rows = []
-            forecast_years = list(range(pd.Timestamp.now().year + 1, pd.Timestamp.now().year + 6))
-            for index, year in enumerate(forecast_years):
-                growth = assumptions["growth"] - index * (
-                    assumptions["growth"] - (assumptions["terminal"] + 1.5)
-                ) / 4
-                revenue *= 1 + growth / 100
-                margin = assumptions["margin"] - (4 - index) * 0.4
-                fcff = revenue * (margin / 100) * (1 - assumptions["tax"] / 100) * 0.86
-                pv_fcff = fcff / ((1 + assumptions["wacc"] / 100) ** (index + 1))
-                forecast_rows.append(
-                    {"Year": year, "Growth": growth, "EBIT Margin": margin, "Revenue": revenue, "FCFF": fcff, "PV of FCFF": pv_fcff}
-                )
+    forecast_tab, sensitivity_tab, method_tab = st.tabs(["Forecast", "Sensitivity", "Sources & Method"])
+    with forecast_tab:
+        forecast_rows = []
+        first_year = pd.Timestamp.now().year + 1
+        for row in result["schedule"]:
+            forecast_rows.append({
+                "Year": first_year + row["year"] - 1,
+                "Growth": row["growth"],
+                "FCFF Margin": row["fcff_margin"],
+                "Revenue": row["revenue"],
+                "FCFF": row["fcff"],
+                "PV of FCFF": row["pv_fcff"],
+            })
+        forecast_df = pd.DataFrame(forecast_rows)
+        chart = go.Figure()
+        chart.add_trace(go.Bar(
+            x=forecast_df["Year"], y=forecast_df["Revenue"] / 1e9,
+            name="Revenue", marker_color=BLUE,
+        ))
+        chart.add_trace(go.Scatter(
+            x=forecast_df["Year"], y=forecast_df["FCFF"] / 1e9,
+            name="FCFF", mode="lines+markers", line=dict(color=PURPLE, width=3),
+        ))
+        chart.update_layout(
+            template="plotly_dark", height=310,
+            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+            font=dict(color=TEXT, family="Inter"), margin=dict(l=10, r=10, t=28, b=10),
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
+            yaxis_title="$ billions",
+        )
+        chart.update_xaxes(gridcolor="rgba(255,255,255,0.05)")
+        chart.update_yaxes(gridcolor="rgba(255,255,255,0.05)")
+        st.plotly_chart(chart, width="stretch", config={"displayModeBar": False})
 
-            forecast_df = pd.DataFrame(forecast_rows)
-            fig = go.Figure()
-            fig.add_trace(go.Bar(
-                x=forecast_df["Year"], y=forecast_df["Revenue"] / 1e9,
-                name="Revenue", marker_color=BLUE,
-            ))
-            fig.add_trace(go.Scatter(
-                x=forecast_df["Year"], y=forecast_df["FCFF"] / 1e9,
-                name="FCFF", mode="lines+markers", line=dict(color=PURPLE, width=3),
-            ))
-            fig.update_layout(
-                template="plotly_dark", height=245,
-                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-                font=dict(color=TEXT, family="Inter"), margin=dict(l=10, r=10, t=10, b=10),
-                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
-                yaxis_title="$ billions",
-            )
-            fig.update_xaxes(gridcolor="rgba(255,255,255,0.05)")
-            fig.update_yaxes(gridcolor="rgba(255,255,255,0.05)")
-            st.plotly_chart(fig, width="stretch", config={"displayModeBar": False})
+        display_forecast = forecast_df.copy()
+        display_forecast["Growth"] = display_forecast["Growth"].map(lambda value: f"{value:.1%}")
+        display_forecast["FCFF Margin"] = display_forecast["FCFF Margin"].map(lambda value: f"{value:.1%}")
+        for column in ["Revenue", "FCFF", "PV of FCFF"]:
+            display_forecast[column] = display_forecast[column].map(lambda value: f"${value / 1e9:,.1f}B")
+        st.dataframe(display_forecast, hide_index=True, width="stretch")
+        st.download_button(
+            "Download DCF forecast (CSV)",
+            forecast_df.to_csv(index=False).encode("utf-8"),
+            file_name=f"{ticker}_dcf_forecast.csv",
+            mime="text/csv",
+            key=f"dcf_download_{ticker}_{scenario_name}",
+        )
 
-            display_forecast = forecast_df.copy()
-            display_forecast["Growth"] = display_forecast["Growth"].map(lambda x: f"{x:.1f}%")
-            display_forecast["EBIT Margin"] = display_forecast["EBIT Margin"].map(lambda x: f"{x:.1f}%")
-            for column in ["Revenue", "FCFF", "PV of FCFF"]:
-                display_forecast[column] = display_forecast[column].map(lambda x: f"${x / 1e9:,.1f}B")
-            st.dataframe(display_forecast, hide_index=True, width="stretch")
-
-    sensitivity_col, reverse_col = st.columns(2)
-    with sensitivity_col:
-        with st.container(border=True):
-            st.markdown("#### Fair Value Sensitivity")
-            wacc_values = [assumptions["wacc"] - 0.5, assumptions["wacc"], assumptions["wacc"] + 0.5]
-            growth_values = [assumptions["terminal"] - 0.5, assumptions["terminal"], assumptions["terminal"] + 0.5]
-            center_value = fair_value
-            matrix = [
-                [center_value * (1 + (assumptions["wacc"] - wacc) * 0.06 + (growth - assumptions["terminal"]) * 0.05)
-                 for growth in growth_values]
-                for wacc in wacc_values
-            ]
-            heatmap = go.Figure(go.Heatmap(
+    with sensitivity_tab:
+        sensitivity_left, sensitivity_right = st.columns([1.35, 0.85])
+        with sensitivity_left:
+            wacc_values = [wacc + offset for offset in [-0.01, -0.005, 0.0, 0.005, 0.01]]
+            growth_values = [max(0.0, terminal_growth + offset) for offset in [-0.01, -0.005, 0.0, 0.005, 0.01]]
+            matrix = []
+            for test_wacc in wacc_values:
+                row_values = []
+                for test_growth in growth_values:
+                    if test_wacc <= test_growth:
+                        row_values.append(None)
+                    else:
+                        row_values.append(run_dcf(**{
+                            **model_inputs,
+                            "wacc": test_wacc,
+                            "terminal_growth": test_growth,
+                        })["value_per_share"])
+                matrix.append(row_values)
+            sensitivity = go.Figure(go.Heatmap(
                 z=matrix,
-                x=[f"g {value:.1f}%" for value in growth_values],
-                y=[f"WACC {value:.1f}%" for value in wacc_values],
+                x=[f"g {value:.1%}" for value in growth_values],
+                y=[f"WACC {value:.1%}" for value in wacc_values],
                 colorscale=[[0, "#7f1d1d"], [0.5, "#1d4ed8"], [1, "#166534"]],
-                text=[[format_price(value) for value in row] for row in matrix],
+                text=[[format_price(value) if value is not None else "—" for value in row] for row in matrix],
                 texttemplate="%{text}",
                 showscale=False,
             ))
-            heatmap.update_layout(
-                template="plotly_dark", height=250,
+            sensitivity.update_layout(
+                template="plotly_dark", height=320,
                 paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-                font=dict(color=TEXT, family="Inter"), margin=dict(l=10, r=10, t=10, b=10),
+                font=dict(color=TEXT, family="Inter"), margin=dict(l=10, r=10, t=25, b=10),
             )
-            st.plotly_chart(heatmap, width="stretch", config={"displayModeBar": False})
+            st.plotly_chart(sensitivity, width="stretch", config={"displayModeBar": False})
 
-    with reverse_col:
-        with st.container(border=True):
-            st.markdown("#### What the Market Price Implies")
-            implied_growth = assumptions["growth"] + 2.6
+        with sensitivity_right:
+            implied_growth = solve_implied_year_one_growth(float(current_price), model_inputs)
+            implied_text = f"{implied_growth:.1%}" if implied_growth is not None else "Outside model range"
             st.markdown(
-                f"""<div class="dcf-reverse"><div class="k">Illustrative reverse DCF</div>
-                <div class="v">≈ {implied_growth:.1f}% annual revenue growth</div></div>
-                <div class="dcf-mini-note">The final version will solve for the growth or margin required to justify the live share price. This preview value is not an investment conclusion.</div>""",
+                f"""<div class="dcf-reverse"><div class="k">Market-implied Year 1 growth</div>
+                <div class="v">{implied_text}</div></div>
+                <div class="dcf-mini-note">Solves for the first forecast year's revenue growth while holding your other assumptions constant.</div>""",
                 unsafe_allow_html=True,
             )
+
+    with method_tab:
+        method_left, method_right = st.columns(2)
+        with method_left:
+            st.markdown("#### Reported inputs")
+            source_rows = [
+                ("Annual revenue", f"Yahoo Finance statements · {history[-1]['year']}"),
+                ("FCFF", "Free cash flow + after-tax interest"),
+                ("Cash and debt", "Latest balance sheet / company data"),
+                ("Shares and price", "Current Yahoo Finance company data"),
+                ("Risk-free rate", f"10Y Treasury proxy (^TNX) · {defaults['risk_free_rate']:.2%}"),
+                ("Equity risk premium", f"Model assumption · {defaults['equity_risk_premium']:.2%}"),
+            ]
+            source_html = "".join(
+                f"<div class='dcf-source'><span class='k'>{label}</span><span class='v'>{value}</span></div>"
+                for label, value in source_rows
+            )
+            st.markdown(source_html, unsafe_allow_html=True)
+        with method_right:
+            st.markdown("#### How the model works")
+            st.markdown(
+                "1. Revenue growth fades from the Year 1 assumption to the final-year assumption.\n"
+                "2. FCFF margin moves from the latest reported margin to your target margin.\n"
+                "3. Annual FCFF is discounted at WACC.\n"
+                "4. Terminal value uses the Gordon Growth formula.\n"
+                "5. Net debt is subtracted and the result is divided by diluted shares."
+            )
+        history_df = pd.DataFrame(history)
+        history_df = history_df.rename(columns={
+            "year": "Year", "revenue": "Revenue", "fcff": "FCFF",
+            "interest": "Interest Expense", "tax_rate": "Tax Rate",
+        })
+        for column in ["Revenue", "FCFF", "Interest Expense"]:
+            history_df[column] = history_df[column].map(lambda value: fmt_big(value))
+        history_df["Tax Rate"] = history_df["Tax Rate"].map(lambda value: f"{value:.1%}")
+        st.dataframe(history_df, hide_index=True, width="stretch")
 
 
 def data_log_block(data):
@@ -1028,7 +1580,23 @@ def history_table(data, limit=150):
 # =============================================================
 # ROUTING
 # =============================================================
-page = nav.split("  ", 1)[-1]
+with st.container(key="mobile_section_nav"):
+    st.markdown("Dashboard section")
+    st.selectbox(
+        "Choose a dashboard section",
+        PAGES,
+        format_func=lambda item: f"🧭 Sections: {item.split('  ', 1)[-1]}",
+        key="mobile_navigation",
+        on_change=sync_mobile_navigation,
+        label_visibility="collapsed",
+    )
+
+page = st.session_state["active_page"].split("  ", 1)[-1]
+
+if page in {"Overview", "Company Analysis", "Watchlist", "Settings"}:
+    comparison_df, basket = get_market_data(COMPANIES)
+if page == "Overview":
+    sp_last, sp_chg, sp_series = get_index_series("^GSPC")
  
 st.markdown(
     """
@@ -1041,7 +1609,7 @@ st.markdown(
 )
  
 st.markdown(
-    f"<div class='nav-hint'><span class='ic'>◀</span> This is a <b>{len(PAGES)}-section dashboard</b> — "
+    f"<div class='nav-hint desktop-nav-hint'><span class='ic'>◀</span> This is a <b>{len(PAGES)}-section dashboard</b> — "
     "use the <b>Menu</b> on the left to explore Company Analysis, Financials, Valuation, Watchlist and more.</div>",
     unsafe_allow_html=True,
 )
@@ -1055,7 +1623,7 @@ with st.container(border=True):
         unsafe_allow_html=True,
     )
 
-    control_1, control_2, control_3 = st.columns([2.2, 1, 1.2])
+    control_1, control_2 = st.columns([2.2, 1.2])
 
     with control_1:
         selected_company = st.selectbox(
@@ -1068,14 +1636,6 @@ with st.container(border=True):
     ticker = COMPANIES[selected_company]
 
     with control_2:
-        st.text_input(
-            "Ticker",
-            value=ticker,
-            disabled=True,
-            key="main_ticker_display",
-        )
-
-    with control_3:
         interval = st.selectbox(
             "Candle interval",
             ["1d", "1wk", "1mo"],
@@ -1089,7 +1649,7 @@ if selected_company in SLEEPER_STOCKS:
 st.markdown("<div style='height:14px;'></div>", unsafe_allow_html=True)
  
 if page == "Overview":
-    page_head("Overview", "Live market snapshot across your 20-stock research universe")
+    page_head("Overview", f"Live market snapshot across your {len(COMPANIES)}-stock research universe")
     summary_cards()
     st.markdown("<div style='height:18px;'></div>", unsafe_allow_html=True)
  
@@ -1155,7 +1715,7 @@ elif page == "Financials":
                            file_name=f"{ticker}_history.csv", mime="text/csv")
  
 elif page == "Valuation":
-    page_head(f"Valuation — {selected_company}", "Multiples, DCF layout preview, and price history")
+    page_head(f"Valuation — {selected_company}", "Market multiples, editable DCF, and price history")
     info = get_fundamentals(ticker)
     pairs = [
         ("Market Cap", fmt_big(g(info, "marketCap"))),
@@ -1169,7 +1729,7 @@ elif page == "Valuation":
         ("52W Low", format_price(g(info, "fiftyTwoWeekLow"))),
     ]
     stat_grid(f"Valuation Multiples — {ticker}", pairs)
-    render_dcf_preview(info)
+    render_dcf_model(info)
     st.markdown("<div style='height:6px;'></div>", unsafe_allow_html=True)
     with st.container(border=True):
         price_chart(height=420, key="period_val")
