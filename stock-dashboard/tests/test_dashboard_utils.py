@@ -11,6 +11,7 @@ from dashboard_utils import (
     risk_statistics,
     statement_value,
     valuation_share_count,
+    valuation_share_count_details,
 )
 
 
@@ -74,6 +75,11 @@ class DashboardUtilsTests(unittest.TestCase):
             valuation_share_count({"marketCap": 1_000, "currentPrice": 20}),
             50,
         )
+
+    def test_valuation_share_count_details_discloses_source(self):
+        details = valuation_share_count_details({"sharesOutstanding": 42})
+        self.assertEqual(details["value"], 42)
+        self.assertIn("fallback", details["source"])
 
     def test_risk_statistics_reports_drawdown_and_returns(self):
         dates = pd.bdate_range("2023-01-02", periods=800)

@@ -15,6 +15,13 @@ from dcf_model import (
     scenario_assumptions,
     solve_implied_year_one_growth,
 )
+from dcf_v2 import (
+    build_v2_defaults,
+    framework_for,
+    run_v2_case,
+    scenario_inputs,
+    solve_v2_assumption,
+)
 from dashboard_utils import (
     align_price_series,
     debt_to_equity_ratio,
@@ -24,6 +31,7 @@ from dashboard_utils import (
     risk_statistics,
     statement_value,
     valuation_share_count,
+    valuation_share_count_details,
 )
 
 
@@ -921,6 +929,12 @@ def get_dcf_financials(symbol):
                 ["Net Income", "Net Income Common Stockholders"],
                 period,
             )
+            operating_income = statement_value(income, ["Operating Income", "EBIT"], period)
+            diluted_average_shares = statement_value(
+                income,
+                ["Diluted Average Shares", "Basic Average Shares"],
+                period,
+            )
             book_equity = statement_value(
                 balance,
                 ["Stockholders Equity", "Common Stock Equity", "Total Equity Gross Minority Interest"],
@@ -970,6 +984,10 @@ def get_dcf_financials(symbol):
                     "revenue": revenue,
                     "fcff": fcff,
                     "net_income": net_income,
+                    "operating_income": operating_income,
+                    "operating_cash_flow": operating_cash_flow,
+                    "capital_expenditure": capital_expenditure,
+                    "diluted_average_shares": diluted_average_shares,
                     "book_equity": book_equity,
                     "interest": interest,
                     "tax_rate": tax_rate,
@@ -2518,6 +2536,209 @@ def render_dcf_model(info):
         st.dataframe(history_df, hide_index=True, width="stretch")
 
 
+def render_dcf_v2(info):
+    """Render the validated-comparison version without replacing the V1 baseline."""
+    statement_data = get_dcf_financials(ticker)
+    history = statement_data.get("history", [])
+    current_price = g(info, "currentPrice") or g(info, "regularMarketPrice")
+    share_details = valuation_share_count_details(info)
+    shares = share_details["value"]
+    if not current_price or not shares:
+        st.error("Current price or aggregate share-count data is unavailable, so DCF V2 cannot calculate a per-share value.")
+        return
+    cash = g(info, "totalCash")
+    debt = g(info, "totalDebt")
+    cash = float(cash if cash is not None else statement_data.get("cash") or 0.0)
+    debt = float(debt if debt is not None else statement_data.get("debt") or 0.0)
+    model_info = {**info, "_risk_free_rate": get_risk_free_rate(), "_equity_risk_premium": 0.045}
+    defaults = build_v2_defaults(ticker, history, model_info, float(shares), debt - cash)
+
+    horizon_text = f"{defaults['horizon']} years" if defaults.get("horizon") else "Not applicable"
+    stat_grid("DCF V2 Framework", [
+        ("Primary valuation framework", defaults["framework"]),
+        ("Modifiers", " · ".join(defaults["modifiers"])),
+        ("Forecast horizon", horizon_text),
+        ("Model status", "Validation comparison — V1 remains default"),
+    ])
+    if not defaults.get("suitable"):
+        for warning in defaults.get("warnings", []):
+            st.warning(warning)
+        st.info("DCF V2 intentionally withholds a consolidated per-share estimate when the selected framework is not financially appropriate.")
+        return
+
+    latest_diluted = next((row.get("diluted_average_shares") for row in reversed(history) if row.get("diluted_average_shares")), None)
+    if latest_diluted and abs(float(shares) / float(latest_diluted) - 1.0) > 0.10:
+        st.warning(
+            f"Current aggregate shares differ from the latest reported diluted weighted-average shares by "
+            f"{abs(float(shares) / float(latest_diluted) - 1.0):.1%}. The current aggregate measure is used; the historical diluted figure is a cross-check."
+        )
+
+    scenario_name = st.radio("DCF V2 scenario", ["Bear", "Base", "Bull"], index=1, horizontal=True, key=f"dcf_v2_scenario_{ticker}")
+    scenario = scenario_inputs(defaults, scenario_name)
+    with st.expander("Edit DCF V2 assumptions", expanded=True):
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            year_one_growth = st.number_input("Year 1 growth (%)", -50.0, 100.0, round(scenario["year_one_growth"] * 100, 1), 0.5, key=f"v2_y1_{ticker}_{scenario_name}", help="Recent reported growth anchor; not inferred from market price.") / 100
+            intermediate_growth = st.number_input("Intermediate-year growth (%)", -20.0, 60.0, round(scenario["intermediate_growth"] * 100, 1), 0.5, key=f"v2_mid_growth_{ticker}_{scenario_name}", help=f"Growth reached around forecast year {scenario['midpoint_year']}.") / 100
+        with c2:
+            mature_growth = st.number_input("Mature growth (%)", 0.0, 6.0, round(scenario["mature_growth"] * 100, 1), 0.25, key=f"v2_mature_growth_{ticker}_{scenario_name}", help="End-of-horizon growth and terminal-growth assumption.") / 100
+            horizon = st.slider("Explicit forecast horizon", 5, 15, int(scenario["horizon"]), key=f"v2_horizon_{ticker}_{scenario_name}", help="Editable period required for the company to approach mature economics.")
+        overrides = {
+            "year_one_growth": year_one_growth,
+            "intermediate_growth": intermediate_growth,
+            "mature_growth": mature_growth,
+            "horizon": horizon,
+            "midpoint_year": max(2, (horizon + 1) // 2),
+        }
+        with c3:
+            if defaults["framework"] == "Financial institution / FCFE":
+                target_roe = st.number_input("Mature ROE (%)", 3.0, 45.0, round(scenario["target_roe"] * 100, 1), 0.5, key=f"v2_roe_{ticker}_{scenario_name}", help="ROE used to determine required retention and distributable FCFE.") / 100
+                discount_rate = st.number_input("Cost of equity (%)", 5.0, 25.0, round(scenario["cost_of_equity"] * 100, 2), 0.25, key=f"v2_ke_{ticker}_{scenario_name}", help="Risk-free rate + beta × equity risk premium; WACC is not used to discount bank FCFE.") / 100
+                overrides.update(target_roe=target_roe, cost_of_equity=discount_rate)
+            elif defaults["framework"] == "Pre-profit / emerging-company DCF":
+                target_operating_margin = st.number_input("Mature operating margin (%)", -10.0, 45.0, round(scenario["target_operating_margin"] * 100, 1), 0.5, key=f"v2_op_margin_{ticker}_{scenario_name}", help="Explicit profitability endpoint; terminal value is disabled if mature FCFF remains non-positive.") / 100
+                sales_to_capital = st.number_input("Sales-to-capital ratio", 0.25, 5.0, float(scenario["sales_to_capital"]), 0.05, key=f"v2_sales_capital_{ticker}_{scenario_name}", help="Incremental revenue divided by reinvestment; lower values imply heavier capital needs.")
+                wacc_input = st.number_input("WACC (%)", 4.0, 25.0, round(scenario["wacc"] * 100, 2), 0.25, key=f"v2_wacc_{ticker}_{scenario_name}", help="Calculated market-value WACC; editable for sensitivity analysis, not calibrated to market price.") / 100
+                overrides.update(target_operating_margin=target_operating_margin, sales_to_capital=sales_to_capital, wacc=wacc_input)
+            else:
+                mature_margin = st.number_input("Mature FCFF margin (%)", -20.0, 65.0, round(scenario["mature_fcff_margin"] * 100, 1), 0.5, key=f"v2_fcff_margin_{ticker}_{scenario_name}", help=f"Issuer-specific economic guardrail: {defaults['margin_guardrail_low']:.0%} to {defaults['margin_guardrail_high']:.0%}.") / 100
+                wacc_input = st.number_input("WACC (%)", 4.0, 25.0, round(scenario["wacc"] * 100, 2), 0.25, key=f"v2_wacc_{ticker}_{scenario_name}", help="Calculated market-value WACC; editable for sensitivity analysis, not calibrated to market price.") / 100
+                overrides.update(mature_fcff_margin=mature_margin, wacc=wacc_input)
+
+    if not (year_one_growth >= intermediate_growth >= mature_growth):
+        st.warning("The selected growth path rises at one or more anchors. That can represent reacceleration, but the assumption should be justified.")
+    if defaults["framework"] not in {"Financial institution / FCFE", "Pre-profit / emerging-company DCF"}:
+        if mature_margin < defaults["margin_guardrail_low"] or mature_margin > defaults["margin_guardrail_high"]:
+            st.warning("The mature FCFF margin is outside this company’s business-model guardrail. The input is not silently clamped.")
+
+    try:
+        result, applied_inputs = run_v2_case(defaults, scenario_name, overrides)
+    except ValueError as error:
+        st.error(str(error))
+        st.info("No terminal value or per-share estimate is presented until the explicit forecast reaches a financially plausible state.")
+        return
+
+    scenario_values = {}
+    for name in ("Bear", "Base", "Bull"):
+        try:
+            scenario_values[name] = run_v2_case(defaults, name, overrides if name == scenario_name else None)[0]["value_per_share"]
+        except ValueError:
+            scenario_values[name] = None
+    base_value = scenario_values.get("Base")
+    base_gap = (base_value / float(current_price) - 1.0) * 100 if base_value is not None else None
+    valid_values = [value for value in scenario_values.values() if value is not None]
+    range_text = f"{format_price(min(valid_values))}–{format_price(max(valid_values))}" if valid_values else "Data unavailable"
+    result_tiles = [
+        ("Current Price", format_price(current_price), ""),
+        ("Bear DCF Value", format_price(scenario_values.get("Bear")), ""),
+        ("Base DCF Value", format_price(base_value), ""),
+        ("Bull DCF Value", format_price(scenario_values.get("Bull")), ""),
+        ("Base Upside / Downside", f"{base_gap:+.1f}%" if base_gap is not None else "Data unavailable", "pos" if base_gap is not None and base_gap >= 0 else "neg"),
+        ("Valuation Range", range_text, ""),
+    ]
+    result_html = "".join(f"<div class='dcf-result'><div class='k'>{label}</div><div class='v {css}'>{value}</div></div>" for label, value, css in result_tiles)
+    st.markdown(f"<div class='dcf-result-grid'>{result_html}</div>", unsafe_allow_html=True)
+    if base_gap is not None:
+        relation = "below" if base_gap >= 0 else "above"
+        st.caption(f"Current market price is {abs(base_gap):.1f}% {relation} the DCF V2 Base estimate.")
+
+    v1 = default_dcf_snapshot(info)
+    comparison = pd.DataFrame([{
+        "Model": "DCF V1 · public baseline",
+        "Base Value": format_price(v1.get("Base") if v1 else None),
+        "Market Difference": f"{(v1['Base'] / v1['Current'] - 1):+.1%}" if v1 and v1.get("Base") else "Data unavailable",
+    }, {
+        "Model": "DCF V2 · validated comparison",
+        "Base Value": format_price(base_value),
+        "Market Difference": f"{base_gap / 100:+.1%}" if base_gap is not None else "Data unavailable",
+    }])
+    st.markdown("#### V1 / V2 comparison")
+    st.dataframe(comparison, hide_index=True, width="stretch")
+
+    breakdown = defaults["wacc_breakdown"]
+    st.markdown("#### WACC transparency")
+    wacc_columns = st.columns(3)
+    applied_discount_rate = applied_inputs["cost_of_equity"] if defaults["framework"] == "Financial institution / FCFE" else applied_inputs["wacc"]
+    metrics = [
+        ("Risk-Free Rate", breakdown["risk_free_rate"], "Latest valid 10-year Treasury proxy (^TNX).", "percent"),
+        ("Raw Beta", breakdown.get("raw_beta", g(info, "beta")), "Unadjusted beta supplied by Yahoo Finance.", "number"),
+        ("Applied Beta", breakdown["beta"], "Raw beta with a disclosed 0.50–2.00 economic guardrail; 1.00 fallback if unavailable.", "number"),
+        ("Equity Risk Premium", breakdown["equity_risk_premium"], "Explicit model assumption; currently 4.5%.", "percent"),
+        ("Cost of Equity", breakdown["cost_of_equity"], "Risk-free rate + applied beta × equity risk premium.", "percent"),
+        ("Pre-Tax Cost of Debt", breakdown["pre_tax_cost_of_debt"], "Reported interest expense ÷ total debt, with a disclosed 2%–12% guardrail.", "percent"),
+        ("Tax Rate", breakdown["tax_rate"], "Latest usable reported effective rate, bounded at 0%–35%.", "percent"),
+        ("Debt Weight", breakdown["debt_weight"], "Debt ÷ (market capitalization + debt).", "percent"),
+        ("Equity Weight", breakdown["equity_weight"], "Market capitalization ÷ (market capitalization + debt).", "percent"),
+        ("Calculated WACC", breakdown["wacc"], "Market-value weighted cost of equity and after-tax debt before scenario edits.", "percent"),
+        ("Applied Discount Rate", applied_discount_rate, "The exact discount rate used in the selected scenario and forecast.", "percent"),
+    ]
+    for index, (label, value, help_text, display_type) in enumerate(metrics):
+        with wacc_columns[index % 3]:
+            display = "Data unavailable" if value is None else (f"{value:.2f}" if display_type == "number" else f"{value:.2%}")
+            st.metric(label, display, help=help_text)
+    if defaults["framework"] == "Financial institution / FCFE":
+        st.caption(f"FCFE is discounted at cost of equity ({applied_inputs['cost_of_equity']:.2%}), not WACC.")
+
+    share_crosscheck = f"{float(latest_diluted) / 1e9:,.2f}B" if latest_diluted else "Data unavailable"
+    stat_grid("Share-count audit", [
+        ("Per-share denominator", f"{float(shares) / 1e9:,.2f}B"),
+        ("Exact measure used", share_details["source"]),
+        ("Latest diluted weighted-average shares", share_crosscheck),
+    ])
+
+    if defaults["framework"] == "Financial institution / FCFE":
+        bridge_pairs = [
+            ("PV of explicit FCFE", fmt_big(result["present_value_fcfe"])),
+            ("PV of terminal value", fmt_big(result["present_value_terminal"])),
+            ("Equity value", fmt_big(result["equity_value"])),
+            ("Aggregate shares", f"{float(shares) / 1e9:,.2f}B"),
+            ("Implied share price", format_price(result["value_per_share"])),
+        ]
+    else:
+        bridge_pairs = [
+            ("Enterprise value", fmt_big(result["enterprise_value"])),
+            ("Less: net debt", fmt_big(applied_inputs["net_debt"])),
+            ("Equity value", fmt_big(result["equity_value"])),
+            ("Aggregate shares", f"{float(shares) / 1e9:,.2f}B"),
+            ("Implied share price", format_price(result["value_per_share"])),
+        ]
+    stat_grid(f"DCF V2 valuation bridge · {scenario_name}", bridge_pairs)
+    if result["terminal_value_share"] > 0.80:
+        st.warning(f"{result['terminal_value_share']:.0%} of modeled value comes from terminal value. The estimate is highly assumption-sensitive.")
+    for warning in defaults.get("warnings", []):
+        st.info(warning)
+
+    forecast_df = pd.DataFrame(result["schedule"])
+    forecast_df.insert(0, "Forecast Year", range(pd.Timestamp.now().year + 1, pd.Timestamp.now().year + 1 + len(forecast_df)))
+    rename = {"growth": "Growth", "revenue": "Revenue", "fcff_margin": "FCFF Margin", "fcff": "FCFF", "operating_margin": "Operating Margin", "nopat": "NOPAT", "reinvestment": "Reinvestment", "earnings": "Net Income", "roe": "ROE", "payout": "Payout", "fcfe": "FCFE"}
+    columns = ["Forecast Year"] + [column for column in rename if column in forecast_df.columns]
+    display_forecast = forecast_df[columns].rename(columns=rename)
+    for column in ["Growth", "FCFF Margin", "Operating Margin", "ROE", "Payout"]:
+        if column in display_forecast:
+            display_forecast[column] = display_forecast[column].map(lambda value: f"{value:.1%}")
+    for column in ["Revenue", "FCFF", "NOPAT", "Reinvestment", "Net Income", "FCFE"]:
+        if column in display_forecast:
+            display_forecast[column] = display_forecast[column].map(fmt_big)
+    st.markdown("#### Explicit forecast path")
+    st.dataframe(display_forecast, hide_index=True, width="stretch")
+
+    st.markdown("#### Reverse DCF · one-variable reconciliations")
+    solver_defaults = {**defaults, **(overrides if scenario_name == "Base" else {})}
+    if defaults["framework"] == "Financial institution / FCFE":
+        solve_fields = [("Year 1 earnings growth", "year_one_growth", -0.30, 0.80), ("Mature ROE", "target_roe", 0.03, 0.45), ("Cost of equity", "cost_of_equity", max(mature_growth + 0.002, 0.04), 0.25), ("Terminal growth", "mature_growth", 0.0, min(solver_defaults["cost_of_equity"] - 0.002, 0.06))]
+    elif defaults["framework"] == "Pre-profit / emerging-company DCF":
+        solve_fields = [("Year 1 revenue growth", "year_one_growth", -0.30, 1.50), ("Mature operating margin", "target_operating_margin", 0.02, 0.45), ("WACC", "wacc", max(mature_growth + 0.002, 0.04), 0.25), ("Terminal growth", "mature_growth", 0.0, min(solver_defaults["wacc"] - 0.002, 0.06))]
+    else:
+        solve_fields = [("Year 1 revenue growth", "year_one_growth", -0.30, 1.50), ("Mature FCFF margin", "mature_fcff_margin", -0.10, 0.65), ("WACC", "wacc", max(mature_growth + 0.002, 0.04), 0.25), ("Terminal growth", "mature_growth", 0.0, min(solver_defaults["wacc"] - 0.002, 0.06))]
+    solutions = []
+    for label, field, lower, upper in solve_fields:
+        solved = solve_v2_assumption(solver_defaults, float(current_price), field, lower, upper)
+        solutions.append({"Assumption solved independently": label, "Market-consistent value": f"{solved:.2%}" if solved is not None else "No solution in tested range"})
+    st.dataframe(pd.DataFrame(solutions), hide_index=True, width="stretch")
+    st.caption("Each row changes only the named Base assumption and holds the others constant; combinations of assumptions could also reconcile the values.")
+    st.info("Reverse DCF does not predict future performance. It shows the assumptions that would make the current market price consistent with this valuation framework.")
+
+
 def data_log_block(data):
     rows = len(data) if data is not None else 0
     cols = data.shape[1] if data is not None else 0
@@ -2704,7 +2925,11 @@ elif page == "Research Notes":
 
 elif page == "DCF Model":
     page_head(f"DCF Model — {selected_company}", "Editable scenario valuation with forecast, sensitivity and reverse DCF")
-    render_dcf_model(security_info)
+    v1_tab, v2_tab = st.tabs(["DCF V1 · Public Baseline", "DCF V2 · Validated Comparison"])
+    with v1_tab:
+        render_dcf_model(security_info)
+    with v2_tab:
+        render_dcf_v2(security_info)
 
 elif page == "Relative Valuation":
     page_head(f"Relative Valuation — {selected_company}", "Trading multiples and relevant peer context")
@@ -2750,12 +2975,17 @@ TTM fields such as revenue, free cash flow and net income use provider-reported 
     with dcf_tab:
         st.markdown(
             """#### DCF methodology
-- **Revenue forecast:** the first-year growth assumption fades linearly toward the final forecast-year rate.
+- **Versioning:** DCF V1 remains the public baseline. DCF V2 is a separately labeled research comparison and does not replace or silently change V1 output.
+- **V1 revenue forecast:** the first-year growth assumption fades linearly toward the final forecast-year rate.
+- **V2 company-aware forecast:** each covered security is assigned a disclosed primary framework, business-model modifiers and a 5–15 year explicit horizon. Growth follows Year 1, intermediate and mature anchors. Mature margins use issuer-specific guardrails rather than one universal cap.
 - **FCFF-margin approach:** unlevered free cash flow is estimated from reported free cash flow plus after-tax interest, then forecast as a margin of revenue. This simplified model does not separately forecast EBIT, taxes, D&A, capital expenditure and working capital.
-- **WACC:** market-value equity and debt weights combine CAPM cost of equity with after-tax cost of debt. CAPM uses the live 10-year Treasury proxy, provider beta and a disclosed 4.5% equity-risk-premium assumption.
+- **Pre-profit V2:** revenue, operating margin, NOPAT and reinvestment are forecast explicitly. Terminal value is withheld if the explicit forecast does not support positive mature cash flow and equity value.
+- **Financial-institution V2:** earnings and required retention are used to estimate FCFE, which is discounted at cost of equity rather than WACC.
+- **WACC:** market-value equity and debt weights combine CAPM cost of equity with after-tax cost of debt. CAPM uses the live 10-year Treasury proxy, provider beta and a disclosed 4.5% equity-risk-premium assumption. V2 discloses raw and applied beta, debt-cost inputs, weights and the exact applied discount rate.
 - **Terminal value:** Gordon Growth Model using final-year FCFF, WACC and terminal growth. WACC must exceed terminal growth.
 - **Net debt:** total debt less cash is subtracted from enterprise value. For banks, an equity DCF is used because deposits and borrowings are operating inputs.
 - **Share count:** aggregate implied shares are preferred, followed by market cap ÷ price, then reported shares outstanding. This avoids treating a single listed share class as the whole company.
+- **Special cases:** V2 intentionally withholds a consolidated Berkshire Hathaway DCF because a sum-of-the-parts or adjusted-NAV framework is more appropriate.
 
 Bear, Base and Bull cases are mechanical spreads around transparent defaults. They are estimates, not price targets or recommendations."""
         )

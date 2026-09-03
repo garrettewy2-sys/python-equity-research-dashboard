@@ -1,7 +1,9 @@
 # DCF V2 design proposal
 
-Status: **Design only — approval required before implementation**  
+Status: **Implemented as a validated comparison; V1 remains the public baseline**
 Baseline: the current DCF V1 remains unchanged and public.
+
+Validation output: `DCF_V2_VALIDATION.md` and `DCF_V2_VALIDATION.csv`.
 
 ## Objective and guardrails
 

@@ -106,17 +106,24 @@ def valuation_share_count(info: Mapping) -> float | None:
     ``impliedSharesOutstanding`` field is therefore preferred when it is valid;
     market capitalization divided by price is the next-best aggregate check.
     """
+    return valuation_share_count_details(info)["value"]
+
+
+def valuation_share_count_details(info: Mapping) -> dict:
+    """Return the chosen aggregate share count together with its exact source."""
     implied = numeric(info.get("impliedSharesOutstanding"))
     if implied is not None and implied > 0:
-        return implied
+        return {"value": implied, "source": "Yahoo impliedSharesOutstanding (current aggregate estimate)"}
 
     market_cap = numeric(info.get("marketCap"))
     price = numeric(info.get("currentPrice", info.get("regularMarketPrice")))
     if market_cap is not None and market_cap > 0 and price is not None and price > 0:
-        return market_cap / price
+        return {"value": market_cap / price, "source": "Yahoo marketCap ÷ currentPrice (aggregate reconciliation)"}
 
     reported = numeric(info.get("sharesOutstanding"))
-    return reported if reported is not None and reported > 0 else None
+    if reported is not None and reported > 0:
+        return {"value": reported, "source": "Yahoo sharesOutstanding (fallback; may be class-specific)"}
+    return {"value": None, "source": "Data unavailable"}
 
 
 def risk_statistics(close: pd.Series, annual_risk_free_rate: float = 0.0) -> dict:
