@@ -1,7 +1,20 @@
+import logging
+
 import streamlit as st
 import yfinance as yf
 import pandas as pd
 import plotly.graph_objects as go
+
+from dashboard_utils import (
+    debt_to_equity_ratio,
+    dividend_yield_percent,
+    equal_weight_index,
+    format_price,
+    statement_value,
+)
+
+
+logger = logging.getLogger(__name__)
  
 # =============================================================
 # PAGE SETUP
@@ -103,6 +116,39 @@ st.markdown(
     }
     .stat .k { color:#94a3b8; font-size:11.5px; font-weight:600; text-transform:uppercase; letter-spacing:0.4px; }
     .stat .v { color:#f8fafc; font-size:18px; font-weight:800; margin-top:3px; }
+
+    /* ---------- DCF layout preview ---------- */
+    .dcf-preview-head {
+        display:flex; align-items:baseline; justify-content:space-between; gap:10px;
+        margin:20px 0 10px 0; flex-wrap:wrap;
+    }
+    .dcf-preview-head .t { color:#f8fafc; font-size:20px; font-weight:800; }
+    .dcf-preview-head .b {
+        color:#f59e0b; background:rgba(245,158,11,0.10); border:1px solid rgba(245,158,11,0.25);
+        border-radius:999px; padding:4px 9px; font-size:11px; font-weight:700; letter-spacing:0.4px;
+    }
+    .dcf-result-grid { display:grid; grid-template-columns:repeat(4, 1fr); gap:12px; margin-bottom:12px; }
+    .dcf-result {
+        background:#0f1b2d; border:1px solid rgba(255,255,255,0.08);
+        border-radius:14px; padding:16px 18px;
+    }
+    .dcf-result .k { color:#94a3b8; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.45px; }
+    .dcf-result .v { color:#f8fafc; font-size:23px; font-weight:800; margin-top:5px; }
+    .dcf-result .v.pos { color:#22c55e; }
+    .dcf-result .v.neg { color:#ef4444; }
+    .dcf-assumption-grid { display:grid; grid-template-columns:1fr 1fr; gap:9px; }
+    .dcf-assumption {
+        background:#0c1626; border:1px solid rgba(255,255,255,0.07);
+        border-radius:10px; padding:10px 12px;
+    }
+    .dcf-assumption .k { color:#94a3b8; font-size:11px; }
+    .dcf-assumption .v { color:#e5eefc; font-size:15px; font-weight:700; margin-top:3px; }
+    .dcf-mini-note { color:#94a3b8; font-size:12px; line-height:1.5; margin-top:10px; }
+    .dcf-reverse {
+        background:#0c1626; border-radius:12px; padding:14px 16px; margin-top:10px;
+    }
+    .dcf-reverse .k { color:#94a3b8; font-size:11px; text-transform:uppercase; letter-spacing:0.45px; }
+    .dcf-reverse .v { color:#f8fafc; font-size:18px; font-weight:800; margin-top:4px; }
  
     /* ---------- Watchlist table ---------- */
     .wl { width:100%; border-collapse:collapse; }
@@ -113,7 +159,7 @@ st.markdown(
     .wl td:first-child { text-align:left; font-weight:700; color:#e5eefc; }
     .wl-scroll { max-height: 360px; overflow-y:auto; }
  
-    /* ---------- Terminal ---------- */
+    /* ---------- Data log ---------- */
     .terminal {
         background:#060d18; border:1px solid rgba(255,255,255,0.08); border-radius:14px;
         padding:16px 18px; font-family: 'SFMono-Regular', Consolas, monospace;
@@ -273,6 +319,8 @@ st.markdown(
         .top-head .th-title { font-size: 22px; }
         /* Denser grids for the narrower screen */
         .stat-grid { grid-template-columns: repeat(2, 1fr); }
+        .dcf-result-grid { grid-template-columns: repeat(2, 1fr); }
+        .dcf-assumption-grid { grid-template-columns: 1fr; }
         .qstats { gap: 16px; }
     }
     </style>
@@ -343,7 +391,15 @@ PERIOD_MAP = {"1M": "1mo", "6M": "6mo", "1Y": "1y", "5Y": "5y", "All": "max"}
 # =============================================================
 @st.cache_data(ttl=300)
 def get_stock_data(symbol, selected_period, selected_interval):
-    return yf.Ticker(symbol).history(period=selected_period, interval=selected_interval)
+    try:
+        data = yf.Ticker(symbol).history(
+            period=selected_period,
+            interval=selected_interval,
+        )
+        return data if isinstance(data, pd.DataFrame) else pd.DataFrame()
+    except Exception:
+        logger.exception("Could not load price history for %s", symbol)
+        return pd.DataFrame()
  
  
 @st.cache_data(ttl=600)
@@ -372,22 +428,12 @@ def get_market_data(companies):
             closes[company] = hist["Close"]
             rows.append(base)
         except Exception:
+            logger.exception("Could not load market data for %s", symbol)
             rows.append(base)
  
     df = pd.DataFrame(rows)
  
-    basket = []
-    norm = []
-    for s in closes.values():
-        s = s.dropna()
-        if len(s) > 5:
-            norm.append((s / s.iloc[0]) * 100.0)
-    if norm:
-        try:
-            mat = pd.concat(norm, axis=1)
-            basket = mat.mean(axis=1).dropna().tolist()
-        except Exception:
-            basket = []
+    basket = equal_weight_index(closes)
     return df, basket
  
  
@@ -402,6 +448,7 @@ def get_index_series(symbol):
         chg = (last - first) / first * 100 if first else 0
         return float(last), float(chg), close.tolist()
     except Exception:
+        logger.exception("Could not load index data for %s", symbol)
         return None, None, []
  
  
@@ -410,12 +457,13 @@ def get_fundamentals(symbol):
     try:
         return yf.Ticker(symbol).info or {}
     except Exception:
+        logger.exception("Could not load fundamentals for %s", symbol)
         return {}
  
  
 @st.cache_data(ttl=900)
 def get_financials(symbol):
-    out = {"years": [], "revenue": [], "net_income": [], "ocf": []}
+    out = {"years": [], "revenue": [], "net_income": [], "ocf": [], "error": None}
     try:
         t = yf.Ticker(symbol)
         inc = getattr(t, "income_stmt", None)
@@ -427,19 +475,22 @@ def get_financials(symbol):
         cols = list(inc.columns)[:5][::-1]  # oldest -> newest
         for c in cols:
             yr = c.year if hasattr(c, "year") else str(c)
+            rev = statement_value(inc, ["Total Revenue", "Operating Revenue"], c)
+            ni = statement_value(inc, ["Net Income", "Net Income Common Stockholders"], c)
+            ocf = statement_value(
+                cf,
+                ["Operating Cash Flow", "Total Cash From Operating Activities"],
+                c,
+            )
+            if rev is None and ni is None and ocf is None:
+                continue
             out["years"].append(str(yr))
-            rev = inc.loc["Total Revenue", c] if "Total Revenue" in inc.index else None
-            ni = inc.loc["Net Income", c] if "Net Income" in inc.index else None
-            ocf = None
-            if cf is not None and not cf.empty and c in cf.columns:
-                for k in ["Operating Cash Flow", "Total Cash From Operating Activities"]:
-                    if k in cf.index:
-                        ocf = cf.loc[k, c]; break
-            out["revenue"].append(float(rev) if pd.notna(rev) else None)
-            out["net_income"].append(float(ni) if pd.notna(ni) else None)
-            out["ocf"].append(float(ocf) if (ocf is not None and pd.notna(ocf)) else None)
+            out["revenue"].append(rev)
+            out["net_income"].append(ni)
+            out["ocf"].append(ocf)
     except Exception:
-        pass
+        logger.exception("Could not load financial statements for %s", symbol)
+        out["error"] = "Financial statement data could not be loaded."
     return out
  
  
@@ -568,9 +619,9 @@ def summary_cards():
     c1, c2, c3, c4 = st.columns(4)
     with c1:
         st.markdown(
-            f"""<div class="sum-card"><div class="label">20-Stock Basket · 1Y</div>
+            f"""<div class="sum-card"><div class="label">20-Stock Basket · Up to 1Y</div>
             <div class="row"><div class="value">{b_val}</div>{b_spark}</div>
-            <div class="sub {b_cls}">{b_arrow} Equal-weight, indexed</div></div>""",
+            <div class="sub {b_cls}">{b_arrow} Equal-weight daily returns</div></div>""",
             unsafe_allow_html=True,
         )
     with c2:
@@ -602,14 +653,14 @@ def summary_cards():
             ycls = "pos" if yval >= 0 else "neg"
             yarrow = "▲" if yval >= 0 else "▼"
             st.markdown(
-                f"""<div class="sum-card"><div class="label">Best Performer · 1Y</div>
+                f"""<div class="sum-card"><div class="label">Best Performer · Up to 1Y</div>
                 <div class="row"><div class="value sm">{yname}</div></div>
                 <div class="sub {ycls}">{yarrow} {yval:+.1f}%</div></div>""",
                 unsafe_allow_html=True,
             )
         else:
             st.markdown(
-                """<div class="sum-card"><div class="label">Best Performer · 1Y</div>
+                """<div class="sum-card"><div class="label">Best Performer · Up to 1Y</div>
                 <div class="row"><div class="value sm">—</div></div>
                 <div class="sub neutral">Data unavailable</div></div>""",
                 unsafe_allow_html=True,
@@ -651,7 +702,7 @@ def price_chart(height=430, key="period_main"):
     )
     fig.update_xaxes(gridcolor="rgba(255,255,255,0.05)", zeroline=False)
     fig.update_yaxes(gridcolor="rgba(255,255,255,0.05)", zeroline=False)
-    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+    st.plotly_chart(fig, width="stretch", config={"displayModeBar": False})
     return data
  
  
@@ -671,7 +722,7 @@ def watchlist_table(df, limit=None):
         )
     st.markdown(
         f"""<div class="panel"><h4>Watchlist</h4><div class="wl-scroll"><table class="wl">
-        <thead><tr><th>Symbol</th><th>Price</th><th>1D %</th><th>1Y %</th></tr></thead>
+        <thead><tr><th>Symbol</th><th>Price</th><th>1D %</th><th>Up to 1Y %</th></tr></thead>
         <tbody>{rows}</tbody></table></div></div>""",
         unsafe_allow_html=True,
     )
@@ -684,12 +735,8 @@ def stat_grid(title, pairs):
  
  
 def fundamentals_pairs(info):
-    de = g(info, "debtToEquity")
-    if de is not None and de > 5:
-        de = de / 100.0
-    dy = g(info, "dividendYield")
-    if dy is not None and dy < 1:
-        dy = dy * 100
+    de = debt_to_equity_ratio(info)
+    dy = dividend_yield_percent(info)
     roe = g(info, "returnOnEquity")
     pm = g(info, "profitMargins")
     return [
@@ -732,7 +779,7 @@ def company_card(info):
         <div class="qstats">
             <div><div class="k">Price</div><div class="v">{price}</div></div>
             <div><div class="k">1D</div><div class="v {dcls}">{dtxt}</div></div>
-            <div><div class="k">1Y</div><div class="v {ycls}">{ytxt}</div></div>
+            <div><div class="k">Up to 1Y</div><div class="v {ycls}">{ytxt}</div></div>
         </div></div>""",
         unsafe_allow_html=True,
     )
@@ -741,8 +788,9 @@ def company_card(info):
 def financials_chart():
     fin = get_financials(ticker)
     if not fin["years"]:
+        message = fin.get("error") or "Financial statement data is unavailable for this ticker."
         st.markdown("<div class='panel'><h4>Financials Overview</h4>"
-                    "<p class='small-muted'>Financial statement data is unavailable for this ticker.</p></div>",
+                    f"<p class='small-muted'>{message}</p></div>",
                     unsafe_allow_html=True)
         return
     yrs = fin["years"]
@@ -761,19 +809,173 @@ def financials_chart():
     st.markdown("<div style='font-size:17px;font-weight:800;color:#f8fafc;margin-bottom:6px;'>Financials Overview</div>",
                 unsafe_allow_html=True)
     with st.container(border=True):
-        st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
- 
- 
-def terminal_block(data):
+        st.plotly_chart(fig, width="stretch", config={"displayModeBar": False})
+
+
+def render_dcf_preview(info):
+    """Render a clearly labeled, illustrative DCF layout for design review."""
+    current_price = g(info, "currentPrice") or g(info, "regularMarketPrice")
+    current_price = float(current_price) if current_price is not None else 100.0
+
+    scenarios = {
+        "Bear": {"growth": 5.0, "margin": 26.0, "tax": 18.0, "wacc": 9.5, "terminal": 2.0, "value": 0.74},
+        "Base": {"growth": 8.0, "margin": 30.0, "tax": 16.0, "wacc": 8.5, "terminal": 2.5, "value": 0.88},
+        "Bull": {"growth": 11.0, "margin": 32.0, "tax": 15.0, "wacc": 7.8, "terminal": 3.0, "value": 1.04},
+    }
+
+    st.markdown(
+        """<div class="dcf-preview-head">
+        <div class="t">Intrinsic Value — DCF Layout Preview</div>
+        <div class="b">DRAFT 1 · ILLUSTRATIVE VALUES ONLY</div>
+        </div>""",
+        unsafe_allow_html=True,
+    )
+
+    scenario_name = st.radio(
+        "DCF preview scenario",
+        list(scenarios),
+        index=1,
+        horizontal=True,
+        key=f"dcf_preview_scenario_{ticker}",
+    )
+    assumptions = scenarios[scenario_name]
+    fair_value = current_price * assumptions["value"]
+    upside = (fair_value / current_price - 1.0) * 100.0
+    upside_class = "pos" if upside >= 0 else "neg"
+    range_low, range_high = current_price * 0.74, current_price * 1.04
+
+    result_tiles = [
+        ("Current Price", format_price(current_price), ""),
+        (f"{scenario_name} Fair Value", format_price(fair_value), ""),
+        ("Upside / Downside", f"{upside:+.1f}%", upside_class),
+        ("Illustrative Range", f"{format_price(range_low)}–{format_price(range_high)}", ""),
+    ]
+    result_html = "".join(
+        f"<div class='dcf-result'><div class='k'>{label}</div><div class='v {css}'>{value}</div></div>"
+        for label, value, css in result_tiles
+    )
+    st.markdown(f"<div class='dcf-result-grid'>{result_html}</div>", unsafe_allow_html=True)
+
+    left, right = st.columns([0.82, 1.55])
+    with left:
+        with st.container(border=True):
+            st.markdown("#### Assumptions")
+            assumption_tiles = [
+                ("Year 1 growth", f"{assumptions['growth']:.1f}%"),
+                ("Target EBIT margin", f"{assumptions['margin']:.1f}%"),
+                ("Tax rate", f"{assumptions['tax']:.1f}%"),
+                ("WACC", f"{assumptions['wacc']:.1f}%"),
+                ("Terminal growth", f"{assumptions['terminal']:.1f}%"),
+                ("Forecast period", "5 years"),
+            ]
+            assumption_html = "".join(
+                f"<div class='dcf-assumption'><div class='k'>{label}</div><div class='v'>{value}</div></div>"
+                for label, value in assumption_tiles
+            )
+            st.markdown(f"<div class='dcf-assumption-grid'>{assumption_html}</div>", unsafe_allow_html=True)
+            st.markdown(
+                "<div class='dcf-mini-note'>In the implemented model these become editable, source-labeled inputs. "
+                "They are locked in this preview because no real DCF calculation is running yet.</div>",
+                unsafe_allow_html=True,
+            )
+
+    with right:
+        with st.container(border=True):
+            st.markdown("#### Revenue and Free Cash Flow Forecast")
+            base_revenue = g(info, "totalRevenue") or 100_000_000_000
+            revenue = float(base_revenue)
+            forecast_rows = []
+            forecast_years = list(range(pd.Timestamp.now().year + 1, pd.Timestamp.now().year + 6))
+            for index, year in enumerate(forecast_years):
+                growth = assumptions["growth"] - index * (
+                    assumptions["growth"] - (assumptions["terminal"] + 1.5)
+                ) / 4
+                revenue *= 1 + growth / 100
+                margin = assumptions["margin"] - (4 - index) * 0.4
+                fcff = revenue * (margin / 100) * (1 - assumptions["tax"] / 100) * 0.86
+                pv_fcff = fcff / ((1 + assumptions["wacc"] / 100) ** (index + 1))
+                forecast_rows.append(
+                    {"Year": year, "Growth": growth, "EBIT Margin": margin, "Revenue": revenue, "FCFF": fcff, "PV of FCFF": pv_fcff}
+                )
+
+            forecast_df = pd.DataFrame(forecast_rows)
+            fig = go.Figure()
+            fig.add_trace(go.Bar(
+                x=forecast_df["Year"], y=forecast_df["Revenue"] / 1e9,
+                name="Revenue", marker_color=BLUE,
+            ))
+            fig.add_trace(go.Scatter(
+                x=forecast_df["Year"], y=forecast_df["FCFF"] / 1e9,
+                name="FCFF", mode="lines+markers", line=dict(color=PURPLE, width=3),
+            ))
+            fig.update_layout(
+                template="plotly_dark", height=245,
+                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                font=dict(color=TEXT, family="Inter"), margin=dict(l=10, r=10, t=10, b=10),
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
+                yaxis_title="$ billions",
+            )
+            fig.update_xaxes(gridcolor="rgba(255,255,255,0.05)")
+            fig.update_yaxes(gridcolor="rgba(255,255,255,0.05)")
+            st.plotly_chart(fig, width="stretch", config={"displayModeBar": False})
+
+            display_forecast = forecast_df.copy()
+            display_forecast["Growth"] = display_forecast["Growth"].map(lambda x: f"{x:.1f}%")
+            display_forecast["EBIT Margin"] = display_forecast["EBIT Margin"].map(lambda x: f"{x:.1f}%")
+            for column in ["Revenue", "FCFF", "PV of FCFF"]:
+                display_forecast[column] = display_forecast[column].map(lambda x: f"${x / 1e9:,.1f}B")
+            st.dataframe(display_forecast, hide_index=True, width="stretch")
+
+    sensitivity_col, reverse_col = st.columns(2)
+    with sensitivity_col:
+        with st.container(border=True):
+            st.markdown("#### Fair Value Sensitivity")
+            wacc_values = [assumptions["wacc"] - 0.5, assumptions["wacc"], assumptions["wacc"] + 0.5]
+            growth_values = [assumptions["terminal"] - 0.5, assumptions["terminal"], assumptions["terminal"] + 0.5]
+            center_value = fair_value
+            matrix = [
+                [center_value * (1 + (assumptions["wacc"] - wacc) * 0.06 + (growth - assumptions["terminal"]) * 0.05)
+                 for growth in growth_values]
+                for wacc in wacc_values
+            ]
+            heatmap = go.Figure(go.Heatmap(
+                z=matrix,
+                x=[f"g {value:.1f}%" for value in growth_values],
+                y=[f"WACC {value:.1f}%" for value in wacc_values],
+                colorscale=[[0, "#7f1d1d"], [0.5, "#1d4ed8"], [1, "#166534"]],
+                text=[[format_price(value) for value in row] for row in matrix],
+                texttemplate="%{text}",
+                showscale=False,
+            ))
+            heatmap.update_layout(
+                template="plotly_dark", height=250,
+                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                font=dict(color=TEXT, family="Inter"), margin=dict(l=10, r=10, t=10, b=10),
+            )
+            st.plotly_chart(heatmap, width="stretch", config={"displayModeBar": False})
+
+    with reverse_col:
+        with st.container(border=True):
+            st.markdown("#### What the Market Price Implies")
+            implied_growth = assumptions["growth"] + 2.6
+            st.markdown(
+                f"""<div class="dcf-reverse"><div class="k">Illustrative reverse DCF</div>
+                <div class="v">≈ {implied_growth:.1f}% annual revenue growth</div></div>
+                <div class="dcf-mini-note">The final version will solve for the growth or margin required to justify the live share price. This preview value is not an investment conclusion.</div>""",
+                unsafe_allow_html=True,
+            )
+
+
+def data_log_block(data):
     rows = len(data) if data is not None else 0
     cols = data.shape[1] if data is not None else 0
     st.markdown(
         f"""<div class="terminal">
         <span class="p">$ python fetch_data.py --ticker {ticker} --interval {interval}</span><br>
         <span class="i">[INFO]</span> <span class="c">Downloading data for {ticker}</span><br>
-        <span class="i">[INFO]</span> <span class="c">Data saved to data/{ticker}_history.csv</span><br>
+        <span class="i">[INFO]</span> <span class="c">Price history loaded from yfinance</span><br>
         <span class="i">[INFO]</span> <span class="c">Rows: {rows} | Columns: {cols}</span><br>
-        <span class="i">[INFO]</span> <span class="c">Success.</span><br>
+        <span class="i">[INFO]</span> <span class="c">Data ready.</span><br>
         <span class="p">$</span></div>""",
         unsafe_allow_html=True,
     )
@@ -806,7 +1008,7 @@ def styled_comparison(df):
             f"<td>{hi}</td><td>{lo}</td><td>{r['Category']}</td><td>{r['Risk Level']}</td></tr>"
         )
     dark_table(
-        ["Company", "Ticker", "Price", "1D %", "1Y %", "52W High", "52W Low", "Category", "Risk"],
+        ["Company", "Ticker", "Price", "1D %", "Up to 1Y %", "52W High", "52W Low", "Category", "Risk"],
         rows, max_height=560,
     )
  
@@ -909,9 +1111,9 @@ if page == "Overview":
         financials_chart()
  
     st.markdown("<div style='height:14px;'></div>", unsafe_allow_html=True)
-    st.markdown("<div style='font-size:17px;font-weight:800;color:#f8fafc;margin-bottom:6px;'>Terminal</div>",
+    st.markdown("<div style='font-size:17px;font-weight:800;color:#f8fafc;margin-bottom:6px;'>Data Log</div>",
                 unsafe_allow_html=True)
-    terminal_block(chart_data)
+    data_log_block(chart_data)
  
 elif page == "Company Analysis":
     page_head(f"Company Analysis — {selected_company}", CATEGORIES.get(selected_company, ""))
@@ -953,7 +1155,7 @@ elif page == "Financials":
                            file_name=f"{ticker}_history.csv", mime="text/csv")
  
 elif page == "Valuation":
-    page_head(f"Valuation — {selected_company}", "Multiples and 52-week range")
+    page_head(f"Valuation — {selected_company}", "Multiples, DCF layout preview, and price history")
     info = get_fundamentals(ticker)
     pairs = [
         ("Market Cap", fmt_big(g(info, "marketCap"))),
@@ -963,10 +1165,11 @@ elif page == "Valuation":
         ("Price / Sales", fmt_x(g(info, "priceToSalesTrailing12Months"))),
         ("Price / Book", fmt_x(g(info, "priceToBook"))),
         ("EV / EBITDA", fmt_x(g(info, "enterpriseToEbitda"))),
-        ("52W High", fmt_big(g(info, "fiftyTwoWeekHigh")).replace("$", "$") if g(info, "fiftyTwoWeekHigh") else "—"),
-        ("52W Low", f"${g(info,'fiftyTwoWeekLow'):,.2f}" if g(info, "fiftyTwoWeekLow") else "—"),
+        ("52W High", format_price(g(info, "fiftyTwoWeekHigh"))),
+        ("52W Low", format_price(g(info, "fiftyTwoWeekLow"))),
     ]
     stat_grid(f"Valuation Multiples — {ticker}", pairs)
+    render_dcf_preview(info)
     st.markdown("<div style='height:6px;'></div>", unsafe_allow_html=True)
     with st.container(border=True):
         price_chart(height=420, key="period_val")
@@ -983,7 +1186,7 @@ elif page == "Watchlist":
                 price = f"${r['Current Price']:,.2f}" if pd.notna(r["Current Price"]) else "—"
                 y = r["1Y Return %"]
                 ycls = "pos" if (pd.notna(y) and y >= 0) else "neg"
-                ytxt = f"{y:+.1f}% 1Y" if pd.notna(y) else "—"
+                ytxt = f"{y:+.1f}% · up to 1Y" if pd.notna(y) else "—"
                 st.markdown(
                     f"""<div class="sum-card"><div class="label">{comp} · {r['Ticker']}</div>
                     <div class="row"><div class="value">{price}</div></div>
