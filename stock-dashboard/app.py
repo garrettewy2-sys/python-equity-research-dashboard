@@ -1,4 +1,5 @@
 import logging
+from html import escape
 
 import streamlit as st
 import yfinance as yf
@@ -29,7 +30,7 @@ logger = logging.getLogger(__name__)
 # PAGE SETUP
 # =============================================================
 st.set_page_config(
-    page_title="Python Equity Research Dashboard",
+    page_title="Equity Intelligence | Research Platform",
     page_icon="📈",
     layout="wide",
     initial_sidebar_state="auto",
@@ -385,6 +386,196 @@ st.markdown(
         .dcf-result .v { font-size:19px; }
         .qstats { gap: 16px; }
     }
+
+    /* =========================================================
+       Stage 3 design system overrides
+       ========================================================= */
+    :root {
+        --ei-bg: #07111f;
+        --ei-surface: #0d192a;
+        --ei-surface-raised: #101e31;
+        --ei-border: rgba(148, 163, 184, 0.18);
+        --ei-border-strong: rgba(148, 163, 184, 0.28);
+        --ei-text: #edf3fb;
+        --ei-muted: #91a3ba;
+        --ei-accent: #5b8def;
+        --ei-radius-sm: 8px;
+        --ei-radius-md: 12px;
+        --ei-space-1: 8px;
+        --ei-space-2: 16px;
+        --ei-space-3: 24px;
+        --ei-space-4: 32px;
+    }
+
+    .stApp {
+        background: var(--ei-bg);
+    }
+    .block-container {
+        max-width: 1440px;
+        padding-top: 1.5rem;
+    }
+    .sum-card, .panel, .thesis-box, .dcf-result, .dcf-assumption,
+    [data-testid="stVerticalBlockBorderWrapper"], .dtab-wrap, .terminal {
+        border-color: var(--ei-border) !important;
+        border-radius: var(--ei-radius-md) !important;
+        box-shadow: none !important;
+    }
+    .sum-card:hover {
+        transform: none;
+        border-color: var(--ei-border-strong);
+    }
+    .page-head .title { font-size: 26px; letter-spacing: -0.35px; }
+    .page-head .sub { color: var(--ei-muted); }
+
+    .product-head {
+        display:flex; align-items:center; justify-content:space-between; gap:16px;
+        padding:0 0 16px; margin-bottom:18px; border-bottom:1px solid var(--ei-border);
+    }
+    .product-head .identity { display:flex; align-items:center; gap:12px; }
+    .product-mark {
+        width:34px; height:34px; border-radius:9px; display:grid; place-items:center;
+        color:#dbeafe; background:#152744; border:1px solid rgba(96,165,250,.34);
+        font-size:17px; font-weight:800;
+    }
+    .product-name { color:var(--ei-text); font-size:22px; font-weight:800; letter-spacing:-.35px; }
+    .product-sub { color:var(--ei-muted); font-size:12px; margin-top:1px; letter-spacing:.25px; }
+    .product-byline { color:var(--ei-muted); font-size:12px; white-space:nowrap; }
+
+    .security-header {
+        display:grid; grid-template-columns:minmax(0,1.55fr) minmax(210px,.8fr); gap:20px;
+        align-items:center; background:var(--ei-surface); border:1px solid var(--ei-border);
+        border-radius:var(--ei-radius-md); padding:18px 20px; margin:0 0 22px;
+    }
+    .security-id { display:flex; align-items:center; gap:14px; min-width:0; }
+    .security-symbol {
+        min-width:58px; height:48px; padding:0 10px; border-radius:9px; display:grid;
+        place-items:center; background:#142744; border:1px solid rgba(96,165,250,.28);
+        color:#bfdbfe; font-size:15px; font-weight:800;
+    }
+    .security-name { color:var(--ei-text); font-size:20px; font-weight:800; line-height:1.2; }
+    .security-meta { color:var(--ei-muted); font-size:12px; margin-top:5px; line-height:1.45; }
+    .security-quote { text-align:right; }
+    .security-price { color:var(--ei-text); font-size:27px; font-weight:800; line-height:1; }
+    .security-change { font-size:13px; font-weight:700; margin-top:7px; }
+    .security-stamp { color:var(--ei-muted); font-size:11px; margin-top:6px; line-height:1.4; }
+
+    .research-note {
+        background:#0c1828; border:1px solid var(--ei-border); border-left:3px solid var(--ei-accent);
+        border-radius:var(--ei-radius-md); padding:16px 18px; margin:0 0 18px;
+    }
+    .research-note .eyebrow {
+        color:#93b7f5; font-size:10.5px; font-weight:800; letter-spacing:.85px;
+        text-transform:uppercase; margin-bottom:7px;
+    }
+    .research-note .title { color:var(--ei-text); font-size:15px; font-weight:750; margin-bottom:6px; }
+    .research-note .body { color:#cbd7e7; font-size:13px; line-height:1.6; }
+    .research-note .source { color:var(--ei-muted); font-size:10.5px; margin-top:8px; }
+    .dcf-preview-head .b {
+        color:#bfd5fb; background:rgba(91,141,239,.10); border-color:rgba(91,141,239,.28);
+    }
+
+    [data-testid="stSidebar"] { background:#081426; border-right:1px solid var(--ei-border); }
+    [data-testid="stSidebar"] .sb-brand {
+        background:#0d1b2f; border-color:var(--ei-border); border-radius:var(--ei-radius-md);
+        padding:15px 16px; margin-bottom:18px;
+    }
+    [data-testid="stSidebar"] .sb-brand .t { font-size:16px; letter-spacing:-.1px; }
+    [data-testid="stSidebar"] .sb-brand .s { font-size:11px; margin-top:4px; }
+    [data-testid="stSidebar"] .nav-title {
+        margin:16px 0 7px 4px; color:#7890ad; font-size:10px; letter-spacing:1.25px;
+    }
+    [data-testid="stSidebar"] .nav-cap { display:none; }
+    [data-testid="stSidebar"] div[role="radiogroup"] { gap:3px; }
+    [data-testid="stSidebar"] div[role="radiogroup"] label {
+        background:transparent; border-color:transparent; border-radius:8px; padding:8px 10px;
+        color:#b9c7da; font-size:13px;
+    }
+    [data-testid="stSidebar"] div[role="radiogroup"] label::after { display:none; }
+    [data-testid="stSidebar"] div[role="radiogroup"] label:hover {
+        transform:none; background:rgba(91,141,239,.08); border-color:transparent;
+    }
+    [data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
+        color:#f5f8fc; background:rgba(91,141,239,.14); border-color:rgba(91,141,239,.22);
+        border-left:2px solid var(--ei-accent); box-shadow:none;
+    }
+
+    @media (min-width: 1024px) {
+        section[data-testid="stSidebar"] {
+            display:block !important; transform:none !important; visibility:visible !important;
+            min-width:17rem !important; width:17rem !important;
+        }
+        [data-testid="stSidebarCollapsedControl"] { display:none !important; }
+        .st-key-mobile_section_nav { display:none !important; }
+    }
+
+    @media (min-width: 1024px) and (max-width: 1199px) {
+        [data-testid="stHorizontalBlock"] { flex-wrap:wrap !important; }
+        [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {
+            min-width:calc(50% - 12px) !important; flex:1 1 calc(50% - 12px) !important;
+        }
+    }
+
+    @media (max-width: 1023px) {
+        [data-testid="stMain"], [data-testid="stAppViewContainer"] {
+            margin-left:0 !important; width:100% !important;
+        }
+        section[data-testid="stSidebar"] {
+            width:min(88vw, 20rem) !important; min-width:min(88vw, 20rem) !important;
+        }
+        section[data-testid="stSidebar"][aria-expanded="false"] {
+            width:0 !important; min-width:0 !important; flex-basis:0 !important;
+        }
+        .st-key-mobile_section_nav {
+            display:block; position:sticky; top:.6rem; z-index:900; background:rgba(7,17,31,.96);
+            border:1px solid var(--ei-border-strong); border-radius:var(--ei-radius-md);
+            padding:7px 9px; margin:0 0 14px 108px; width:calc(100% - 108px);
+        }
+        .st-key-mobile_section_nav [data-testid="stMarkdownContainer"] { display:none; }
+        [data-testid="stSidebarCollapsedControl"] {
+            position:fixed !important; top:.7rem !important; left:.65rem !important; z-index:1002 !important;
+        }
+        [data-testid="stSidebarCollapsedControl"] button {
+            min-width:86px !important; height:40px !important; padding:0 11px !important;
+            background:#1d4f91 !important; border:1px solid rgba(147,197,253,.4) !important;
+            border-radius:9px !important; box-shadow:none !important;
+        }
+        [data-testid="stSidebarCollapsedControl"] button::after {
+            content:"Menu"; color:white; font-size:12px; font-weight:750; margin-left:5px;
+        }
+        [data-testid="stExpandSidebarButton"] {
+            position:fixed !important; top:.65rem !important; left:.65rem !important; z-index:1003 !important;
+            width:98px !important; min-width:98px !important; height:40px !important;
+            padding:0 11px !important; background:#1d4f91 !important;
+            border:1px solid rgba(147,195,253,.42) !important; border-radius:9px !important;
+            box-shadow:none !important;
+        }
+        [data-testid="stExpandSidebarButton"]::after {
+            content:"Menu"; color:#fff; font-size:12px; font-weight:750; margin-left:5px;
+        }
+        [data-testid="stHorizontalBlock"] { flex-wrap:wrap !important; }
+        [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {
+            min-width:calc(50% - 10px) !important; flex:1 1 calc(50% - 10px) !important;
+        }
+        .security-header { grid-template-columns:1fr; gap:13px; }
+        .security-quote { text-align:left; padding-left:72px; }
+    }
+
+    @media (max-width: 600px) {
+        .block-container { padding:1rem .8rem 4rem 1.25rem; }
+        [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {
+            min-width:100% !important; flex:1 1 100% !important;
+        }
+        .product-head { align-items:flex-start; }
+        .product-name { font-size:19px; }
+        .product-byline { display:none; }
+        .security-header { padding:15px; }
+        .security-id { align-items:flex-start; }
+        .security-symbol { min-width:52px; height:43px; }
+        .security-name { font-size:18px; }
+        .security-quote { padding-left:66px; }
+        .security-price { font-size:24px; }
+        .stat-grid, .dcf-result-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+    }
     </style>
     """,
     unsafe_allow_html=True,
@@ -738,48 +929,82 @@ def fmt_pct(v):
 st.sidebar.markdown(
     """
     <div class="sb-brand">
-        <div class="t">📈 EQUITY RESEARCH</div>
-        <div class="s">Independent Project · Garrett Ewy</div>
+        <div class="t">Equity Intelligence</div>
+        <div class="s">Equity Research Platform</div>
     </div>
     """,
     unsafe_allow_html=True,
 )
- 
+
 PAGES = [
-    "🏠  Overview", "📊  Company Analysis", "📈  Financials", "💲  Valuation",
-    "⭐  Watchlist", "📓  Notebook", "⚙️  Settings",
+    "Overview", "Company Analysis", "Financials", "Valuation",
+    "Watchlist", "Research Notes", "About",
 ]
 
+LEGACY_PAGE_NAMES = {
+    "🏠  Overview": "Overview",
+    "📊  Company Analysis": "Company Analysis",
+    "📈  Financials": "Financials",
+    "💲  Valuation": "Valuation",
+    "⭐  Watchlist": "Watchlist",
+    "📓  Notebook": "Research Notes",
+    "⚙️  Settings": "About",
+}
+for state_key in ("active_page", "mobile_navigation"):
+    if st.session_state.get(state_key) in LEGACY_PAGE_NAMES:
+        st.session_state[state_key] = LEGACY_PAGE_NAMES[st.session_state[state_key]]
 
-def sync_sidebar_navigation():
-    st.session_state["active_page"] = st.session_state["sidebar_navigation"]
-    st.session_state["mobile_navigation"] = st.session_state["sidebar_navigation"]
+NAV_GROUPS = {
+    "RESEARCH": ["Overview", "Company Analysis", "Financials", "Watchlist", "Research Notes"],
+    "VALUATION": ["Valuation"],
+    "INFORMATION": ["About"],
+}
+
+
+def nav_key(group_name):
+    return f"nav_{group_name.lower()}"
+
+
+def sync_sidebar_navigation(group_name):
+    selected = st.session_state.get(nav_key(group_name))
+    if not selected:
+        return
+    st.session_state["active_page"] = selected
+    st.session_state["mobile_navigation"] = selected
+    for other_group in NAV_GROUPS:
+        if other_group != group_name:
+            st.session_state[nav_key(other_group)] = None
 
 
 def sync_mobile_navigation():
     st.session_state["active_page"] = st.session_state["mobile_navigation"]
-    st.session_state["sidebar_navigation"] = st.session_state["mobile_navigation"]
+    selected = st.session_state["mobile_navigation"]
+    for group_name, group_pages in NAV_GROUPS.items():
+        st.session_state[nav_key(group_name)] = selected if selected in group_pages else None
 
 
 st.session_state.setdefault("active_page", PAGES[0])
-st.session_state.setdefault("sidebar_navigation", st.session_state["active_page"])
 st.session_state.setdefault("mobile_navigation", st.session_state["active_page"])
 
-st.sidebar.markdown(
-    f"<div class='nav-title'><span class='dot'>●</span> Menu</div>"
-    f"<div class='nav-cap'>{len(PAGES)} sections · tap one to explore ↓</div>",
-    unsafe_allow_html=True,
-)
-nav = st.sidebar.radio(
-    "Navigation",
-    PAGES,
-    label_visibility="collapsed",
-    key="sidebar_navigation",
-    on_change=sync_sidebar_navigation,
-)
- 
+for group_name, group_pages in NAV_GROUPS.items():
+    group_key = nav_key(group_name)
+    if group_key not in st.session_state:
+        st.session_state[group_key] = (
+            st.session_state["active_page"] if st.session_state["active_page"] in group_pages else None
+        )
+    st.sidebar.markdown(f"<div class='nav-title'>{group_name}</div>", unsafe_allow_html=True)
+    st.sidebar.radio(
+        group_name,
+        group_pages,
+        index=None,
+        label_visibility="collapsed",
+        key=group_key,
+        on_change=sync_sidebar_navigation,
+        args=(group_name,),
+    )
+
 st.sidebar.divider()
-st.sidebar.caption("Data via yfinance · Educational use only · Not financial advice.")
+st.sidebar.caption("Market and fundamentals data via Yahoo Finance. Research use only; not investment advice.")
  
 # Heavy universe data is loaded later, only on pages that use it.
 comparison_df = pd.DataFrame()
@@ -794,6 +1019,72 @@ def page_head(title, sub=""):
     st.markdown(
         f"""<div class="page-head"><div class="title">{title}</div>
         <div class="sub">{sub}</div></div>""",
+        unsafe_allow_html=True,
+    )
+
+
+def security_header(info):
+    """Keep company and quote context visible across research pages."""
+    name = escape(str(g(info, "longName") or selected_company))
+    sector = escape(str(g(info, "sector") or CATEGORIES.get(selected_company, "Sector unavailable")))
+    industry = escape(str(g(info, "industry") or "Industry unavailable"))
+    exchange = escape(str(g(info, "fullExchangeName") or g(info, "exchange") or "Exchange unavailable"))
+
+    price = g(info, "currentPrice") or g(info, "regularMarketPrice")
+    change = g(info, "regularMarketChange")
+    change_pct = g(info, "regularMarketChangePercent")
+    if price is None or change is None or change_pct is None:
+        quote_history = get_stock_data(ticker, "5d", "1d")
+        closes = quote_history["Close"].dropna() if not quote_history.empty and "Close" in quote_history else pd.Series(dtype=float)
+        if not closes.empty and price is None:
+            price = float(closes.iloc[-1])
+        if len(closes) >= 2:
+            change = float(closes.iloc[-1] - closes.iloc[-2]) if change is None else change
+            change_pct = float(change / closes.iloc[-2] * 100.0) if change_pct is None and closes.iloc[-2] else change_pct
+
+    quote_time = g(info, "regularMarketTime")
+    if quote_time:
+        updated = pd.to_datetime(quote_time, unit="s", utc=True).tz_convert("America/Chicago")
+        timestamp = updated.strftime("%b %d, %Y · %I:%M %p CT")
+    else:
+        timestamp = "Timestamp unavailable"
+
+    price_text = format_price(price)
+    if change is not None and change_pct is not None:
+        direction = "pos" if change >= 0 else "neg"
+        change_text = f"{change:+,.2f} ({change_pct:+.2f}%)"
+    else:
+        direction = "neutral"
+        change_text = "Change unavailable"
+
+    st.markdown(
+        f"""<div class="security-header">
+        <div class="security-id">
+            <div class="security-symbol">{escape(ticker)}</div>
+            <div><div class="security-name">{name}</div>
+            <div class="security-meta">{sector} · {industry} · {exchange}</div></div>
+        </div>
+        <div class="security-quote">
+            <div class="security-price">{price_text}</div>
+            <div class="security-change {direction}">{change_text}</div>
+            <div class="security-stamp">Latest available quote · {timestamp}<br>Yahoo Finance via yfinance</div>
+        </div></div>""",
+        unsafe_allow_html=True,
+    )
+
+
+def research_note_block(compact=False):
+    """Present authored commentary separately from sourced market facts."""
+    note = NOTES[selected_company]
+    if compact and len(note) > 330:
+        note = note[:330].rsplit(" ", 1)[0] + "…"
+    st.markdown(
+        f"""<div class="research-note">
+        <div class="eyebrow">Research Notes · Author viewpoint</div>
+        <div class="title">{escape(selected_company)} — Investment thesis</div>
+        <div class="body">{escape(note)}</div>
+        <div class="source">Commentary by Garrett Ewy. This is personal research analysis, not sourced company data or an investment recommendation.</div>
+        </div>""",
         unsafe_allow_html=True,
     )
  
@@ -1209,7 +1500,7 @@ def render_dcf_model(info):
     st.markdown(
         """<div class="dcf-preview-head">
         <div class="t">Intrinsic Value — Discounted Cash Flow</div>
-        <div class="b">ACTIVE MODEL · EDITABLE</div>
+        <div class="b">EDITABLE RESEARCH MODEL</div>
         </div>""",
         unsafe_allow_html=True,
     )
@@ -1223,7 +1514,11 @@ def render_dcf_model(info):
         render_bank_equity_dcf(model_info, statement_data)
         return
 
-    st.caption("Two-stage unlevered free-cash-flow model using reported annual financials. Assumptions are estimates, not facts.")
+    st.caption(
+        "Simplified margin-based two-stage unlevered DCF using reported annual financials. "
+        "It does not separately forecast EBIT, taxes, D&A, capital expenditure, or working capital. "
+        "Assumptions are estimates, not facts."
+    )
     history = [
         row for row in statement_data["history"]
         if row.get("revenue") is not None and row.get("fcff") is not None
@@ -1581,36 +1876,34 @@ def history_table(data, limit=150):
 # ROUTING
 # =============================================================
 with st.container(key="mobile_section_nav"):
-    st.markdown("Dashboard section")
+    st.markdown("Research navigation")
     st.selectbox(
-        "Choose a dashboard section",
+        "Choose a research section",
         PAGES,
-        format_func=lambda item: f"🧭 Sections: {item.split('  ', 1)[-1]}",
+        format_func=lambda item: f"Current section: {item}",
         key="mobile_navigation",
         on_change=sync_mobile_navigation,
         label_visibility="collapsed",
     )
 
-page = st.session_state["active_page"].split("  ", 1)[-1]
+page = st.session_state["active_page"]
 
-if page in {"Overview", "Company Analysis", "Watchlist", "Settings"}:
+if page in {"Overview", "Company Analysis", "Watchlist"}:
     comparison_df, basket = get_market_data(COMPANIES)
 if page == "Overview":
     sp_last, sp_chg, sp_series = get_index_series("^GSPC")
- 
+
 st.markdown(
     """
-    <div class="top-head">
-        <div class="th-title">📈 <span class="accent">Equity Research</span> Dashboard</div>
-        <div class="th-sub">by Garrett Ewy</div>
+    <div class="product-head">
+        <div class="identity">
+            <div class="product-mark">EI</div>
+            <div><div class="product-name">Equity Intelligence</div>
+            <div class="product-sub">Equity Research Platform</div></div>
+        </div>
+        <div class="product-byline">Built by Garrett Ewy</div>
     </div>
     """,
-    unsafe_allow_html=True,
-)
- 
-st.markdown(
-    f"<div class='nav-hint desktop-nav-hint'><span class='ic'>◀</span> This is a <b>{len(PAGES)}-section dashboard</b> — "
-    "use the <b>Menu</b> on the left to explore Company Analysis, Financials, Valuation, Watchlist and more.</div>",
     unsafe_allow_html=True,
 )
 
@@ -1619,7 +1912,7 @@ st.markdown(
 # =============================================================
 with st.container(border=True):
     st.markdown(
-        "<div style='font-size:17px;font-weight:800;color:#f8fafc;margin-bottom:10px;'>Dashboard Controls</div>",
+        "<div style='font-size:14px;font-weight:750;color:#e7eef8;margin-bottom:8px;'>Research context</div>",
         unsafe_allow_html=True,
     )
 
@@ -1637,21 +1930,26 @@ with st.container(border=True):
 
     with control_2:
         interval = st.selectbox(
-            "Candle interval",
+            "Chart interval",
             ["1d", "1wk", "1mo"],
             index=0,
             key="main_interval_select",
         )
 
 if selected_company in SLEEPER_STOCKS:
-    st.warning("High-upside watchlist stock: higher risk / higher potential upside.")
+    st.warning("Higher-risk coverage company. Review the underlying thesis and model assumptions carefully.")
 
 st.markdown("<div style='height:14px;'></div>", unsafe_allow_html=True)
- 
+
+security_info = get_fundamentals(ticker) if page not in {"Watchlist", "About"} else {}
+if page not in {"Watchlist", "About"}:
+    security_header(security_info)
+
 if page == "Overview":
-    page_head("Overview", f"Live market snapshot across your {len(COMPANIES)}-stock research universe")
+    page_head("Overview", f"Latest available market snapshot across your {len(COMPANIES)}-stock research universe")
     summary_cards()
     st.markdown("<div style='height:18px;'></div>", unsafe_allow_html=True)
+    research_note_block(compact=True)
  
     left, right = st.columns([2.1, 1])
     with left:
@@ -1663,7 +1961,7 @@ if page == "Overview":
         watchlist_table(comparison_df)
  
     st.markdown("<div style='height:14px;'></div>", unsafe_allow_html=True)
-    info = get_fundamentals(ticker)
+    info = security_info
     cc1, cc2 = st.columns([1, 1.1])
     with cc1:
         stat_grid(f"Company Analysis — {ticker}", fundamentals_pairs(info))
@@ -1677,14 +1975,10 @@ if page == "Overview":
  
 elif page == "Company Analysis":
     page_head(f"Company Analysis — {selected_company}", CATEGORIES.get(selected_company, ""))
-    info = get_fundamentals(ticker)
- 
-    # ---- Investment thesis FIRST (lead with the original research) ----
-    st.markdown(
-        f"<div class='thesis-head'><span class='star'>★</span> Investment Thesis — {selected_company}</div>",
-        unsafe_allow_html=True,
-    )
-    st.markdown(f"<div class='thesis-box thesis-lg'>{NOTES[selected_company]}</div>", unsafe_allow_html=True)
+    info = security_info
+
+    # Authored research is deliberately separated from sourced company facts.
+    research_note_block()
     st.markdown("<div style='height:18px;'></div>", unsafe_allow_html=True)
  
     # ---- Snapshot + key metrics ----
@@ -1716,7 +2010,7 @@ elif page == "Financials":
  
 elif page == "Valuation":
     page_head(f"Valuation — {selected_company}", "Market multiples, editable DCF, and price history")
-    info = get_fundamentals(ticker)
+    info = security_info
     pairs = [
         ("Market Cap", fmt_big(g(info, "marketCap"))),
         ("Trailing P/E", fmt_x(g(info, "trailingPE"))),
@@ -1764,39 +2058,36 @@ elif page == "Watchlist":
     st.download_button("⬇ Download universe (CSV)", comparison_df.to_csv(index=False).encode("utf-8"),
                        file_name="equity_universe.csv", mime="text/csv")
  
-elif page == "Notebook":
-    page_head("Research Notebook", "Investment theses across the universe")
-    st.markdown(f"<div style='font-size:16px;font-weight:800;color:#f8fafc;margin-bottom:6px;'>"
-                f"{selected_company} — Thesis</div>", unsafe_allow_html=True)
-    st.markdown(f"<div class='thesis-box'>{NOTES[selected_company]}</div>", unsafe_allow_html=True)
+elif page == "Research Notes":
+    page_head("Research Notes", "Authored investment theses across the coverage universe")
+    research_note_block()
     st.markdown("<div style='height:14px;'></div>", unsafe_allow_html=True)
-    with st.expander("View all 20 theses"):
+    with st.expander(f"View all {len(COMPANIES)} research notes"):
         for comp in COMPANIES:
             st.markdown(f"**{comp}** — {CATEGORIES[comp]} · {RISK_LEVELS[comp]} risk")
             st.markdown(f"<div class='small-muted' style='margin-bottom:12px;'>{NOTES[comp]}</div>",
                         unsafe_allow_html=True)
- 
-elif page == "Settings":
-    page_head("Settings", "About this dashboard")
+
+elif page == "About":
+    page_head("About", "Project purpose and implementation")
     st.markdown(
         """<div class="panel">
-        <h4>Python Equity Research Dashboard</h4>
-        <p class="small-muted">An independent project by <b>Garrett Ewy</b>, built with Python, Streamlit,
-        yfinance, Pandas, and Plotly. It tracks 20 companies across technology, finance, defense, fintech,
-        and space — comparing market metrics, visualizing price action with moving averages, and pairing
-        each name with an investment thesis.</p>
-        <p class="small-muted" style="margin-top:10px;">Theme colors: deep navy <code>#07111f</code>,
-        panel <code>#0f1b2d</code>, accent blue <code>#3b82f6</code>. Data is cached and refreshed
-        periodically via yfinance.</p>
-        <p class="small-muted" style="margin-top:10px;color:#f59e0b;">For learning and research only.
-        This is not financial advice.</p>
+        <h4>Equity Intelligence</h4>
+        <p class="small-muted">Equity Intelligence is an interactive equity-research platform designed
+        to combine market data, fundamental analysis, valuation and quantitative research tools in one
+        workflow. The current coverage universe contains 19 public companies.</p>
+        <p class="small-muted" style="margin-top:10px;">Built by <b>Garrett Ewy</b> using Python,
+        Streamlit, yfinance, Pandas and Plotly. Market and fundamental information is cached to improve
+        responsiveness and reduce unnecessary source requests.</p>
+        <p class="small-muted" style="margin-top:10px;color:#d6a85f;">Models and commentary are for
+        educational and research purposes. They are estimates, not investment recommendations.</p>
         </div>""",
         unsafe_allow_html=True,
     )
  
 st.divider()
 st.caption(
-    "Created by Garrett Ewy. Built for educational equity research purposes using Python, Streamlit, "
-    "yfinance, Pandas, and Plotly. This is not financial advice."
+    "Equity Intelligence · Built by Garrett Ewy · Market and fundamental data via Yahoo Finance. "
+    "Educational research only; not investment advice."
 )
  
