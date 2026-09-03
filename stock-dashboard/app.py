@@ -16,6 +16,7 @@ from dcf_model import (
     solve_implied_year_one_growth,
 )
 from dashboard_utils import (
+    align_price_series,
     debt_to_equity_ratio,
     dividend_yield_percent,
     equal_weight_index,
@@ -429,10 +430,7 @@ st.markdown(
     .page-head .title { font-size: 26px; letter-spacing: -0.35px; }
     .page-head .sub { color: var(--ei-muted); }
 
-    .product-head {
-        display:flex; align-items:center; justify-content:space-between; gap:16px;
-        padding:0 0 16px; margin-bottom:18px; border-bottom:1px solid var(--ei-border);
-    }
+    .product-head { display:flex; align-items:center; gap:12px; padding:2px 0; }
     .product-head .identity { display:flex; align-items:center; gap:12px; }
     .product-mark {
         width:34px; height:34px; border-radius:9px; display:grid; place-items:center;
@@ -441,15 +439,13 @@ st.markdown(
     }
     .product-name { color:var(--ei-text); font-size:22px; font-weight:800; letter-spacing:-.35px; }
     .product-sub { color:var(--ei-muted); font-size:12px; margin-top:1px; letter-spacing:.25px; }
-    .product-byline { color:var(--ei-muted); font-size:12px; white-space:nowrap; }
-
-    .st-key-security_selector {
-        border:1px solid var(--ei-border); border-radius:var(--ei-radius-sm);
-        background:#0a1728; padding:7px 12px 2px; margin:-5px 0 12px;
+    .product-byline { color:var(--ei-muted); font-size:10.5px; margin-top:4px; }
+    .st-key-application_header {
+        border-bottom:1px solid var(--ei-border); padding:0 0 12px; margin-bottom:12px;
     }
-    .st-key-security_selector [data-testid="stHorizontalBlock"] { align-items:center; }
-    .st-key-security_selector [data-testid="stSelectbox"] { margin-bottom:0; }
-    .ticker-selector-label { color:var(--ei-muted); font-size:11px; font-weight:750; text-transform:uppercase; letter-spacing:.65px; }
+    .st-key-application_header [data-testid="stHorizontalBlock"] { align-items:center; }
+    .st-key-application_header [data-testid="stSelectbox"] { margin-bottom:0; }
+    .header-selector-label { color:var(--ei-muted); font-size:10px; font-weight:750; text-transform:uppercase; letter-spacing:.65px; margin-bottom:3px; }
 
     .security-header {
         display:grid; grid-template-columns:minmax(0,1.55fr) minmax(210px,.8fr); gap:20px;
@@ -487,10 +483,42 @@ st.markdown(
     [data-testid="stSidebar"] { background:#081426; border-right:1px solid var(--ei-border); }
     [data-testid="stSidebar"] .sb-brand {
         background:#0d1b2f; border-color:var(--ei-border); border-radius:var(--ei-radius-md);
-        padding:15px 16px; margin-bottom:18px;
+        padding:12px 13px; margin-bottom:18px; display:flex; align-items:center; gap:10px;
     }
-    [data-testid="stSidebar"] .sb-brand .t { font-size:16px; letter-spacing:-.1px; }
+    [data-testid="stSidebar"] .sb-brand .mark {
+        width:32px; height:32px; border-radius:8px; display:grid; place-items:center;
+        background:#152744; border:1px solid rgba(96,165,250,.3); color:#bfdbfe;
+        font-size:12px; font-weight:850; flex:0 0 auto;
+    }
+    [data-testid="stSidebar"] .sb-brand .t { font-size:14px; letter-spacing:-.1px; }
     [data-testid="stSidebar"] .sb-brand .s { font-size:11px; margin-top:4px; }
+
+    .company-description {
+        background:#0f1b2d; border:1px solid var(--ei-border); border-radius:var(--ei-radius-md);
+        padding:15px 17px; color:#cbd7e7; font-size:13px; line-height:1.58;
+        display:-webkit-box; -webkit-line-clamp:6; -webkit-box-orient:vertical; overflow:hidden;
+    }
+    .financial-statement-scroll {
+        width:100%; overflow-x:auto; border:1px solid var(--ei-border); border-radius:var(--ei-radius-sm);
+    }
+    .financial-statement { width:max-content; min-width:100%; border-collapse:separate; border-spacing:0; }
+    .financial-statement th, .financial-statement td {
+        padding:10px 13px; border-bottom:1px solid rgba(255,255,255,.06); white-space:nowrap;
+        text-align:right; font-size:12.5px;
+    }
+    .financial-statement th { color:#91a3ba; background:#0c1828; font-size:10.5px; text-transform:uppercase; letter-spacing:.45px; }
+    .financial-statement th:first-child, .financial-statement td:first-child {
+        position:sticky; left:0; z-index:2; text-align:left; min-width:180px;
+        background:#0d1a2c; box-shadow:1px 0 0 rgba(255,255,255,.09);
+    }
+    .financial-statement td:first-child { color:#e5eefc; font-weight:650; }
+    .financial-statement tr:last-child td { border-bottom:0; }
+
+    .formula-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+    .formula-card { background:#0f1b2d; border:1px solid var(--ei-border); border-radius:var(--ei-radius-sm); padding:15px 17px; }
+    .formula-card .name { color:#93b7f5; font-size:10.5px; text-transform:uppercase; letter-spacing:.7px; font-weight:800; }
+    .formula-card .formula { color:#f8fafc; font-size:16px; font-weight:750; margin:8px 0; font-family:ui-monospace,SFMono-Regular,Consolas,monospace; }
+    .formula-card .explain { color:#91a3ba; font-size:12px; line-height:1.55; }
     [data-testid="stSidebar"] .nav-title {
         margin:16px 0 7px 4px; color:#7890ad; font-size:10px; letter-spacing:1.25px;
     }
@@ -582,13 +610,14 @@ st.markdown(
         [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {
             min-width:100% !important; flex:1 1 100% !important;
         }
-        .product-head { align-items:flex-start; flex-wrap:wrap; }
-        .product-head .identity { width:100%; }
+        .product-head { align-items:flex-start; }
         .product-name { font-size:18px; }
-        .product-byline { display:block; width:100%; padding-left:46px; margin-top:-8px; font-size:10.5px; }
+        .product-byline { font-size:10px; }
         .product-sub { max-width:270px; line-height:1.35; }
-        .st-key-security_selector { padding:5px 9px 0; }
-        .ticker-selector-label { display:none; }
+        .st-key-application_header [data-testid="stHorizontalBlock"] { gap:6px; }
+        .header-selector-label { display:none; }
+        .formula-grid { grid-template-columns:1fr; }
+        .financial-statement th:first-child, .financial-statement td:first-child { min-width:145px; }
         .security-header { padding:15px; }
         .security-id { align-items:flex-start; }
         .security-symbol { min-width:52px; height:43px; }
@@ -680,6 +709,7 @@ PEER_GROUPS = {
     "SoFi": ["JPMorgan Chase", "Goldman Sachs", "Visa"],
     "Uber": ["Tesla", "Amazon", "Meta"],
 }
+MEGA_CAP_TECH = ["Apple", "Microsoft", "Alphabet / Google", "Meta", "Amazon"]
  
 # =============================================================
 # DATA FUNCTIONS
@@ -837,6 +867,8 @@ def get_company_metrics(company_names):
         rows.append({
             "Company": company_name,
             "Ticker": symbol,
+            "Sector": g(info, "sector"),
+            "Industry": g(info, "industry"),
             "Market Cap": market_cap,
             "P/E TTM": g(info, "trailingPE"),
             "EV / EBITDA": g(info, "enterpriseToEbitda"),
@@ -1031,8 +1063,9 @@ def fmt_pct(v):
 st.sidebar.markdown(
     """
     <div class="sb-brand">
-        <div class="t">Equity Research Dashboard</div>
-        <div class="s">Built by Garrett Ewy</div>
+        <div class="mark">ER</div>
+        <div><div class="t">Research Dashboard</div>
+        <div class="s">Equity research</div></div>
     </div>
     """,
     unsafe_allow_html=True,
@@ -1548,7 +1581,7 @@ STATEMENT_LINES = {
 }
 
 
-def statement_display_frame(statement, definitions):
+def statement_display_frame(statement, definitions, quarterly=False):
     if statement is None or statement.empty:
         return pd.DataFrame()
     periods = list(statement.columns)[:6]
@@ -1563,29 +1596,64 @@ def statement_display_frame(statement, definitions):
             available = available or value is not None
         if available:
             rows.append(row)
+    if rows and rows[0].get("Line Item") == "Revenue":
+        revenue_row = rows[0]
+        period_headings = list(revenue_row.keys())[1:]
+        lag = 4 if quarterly else 1
+        growth_row = {"Line Item": "Revenue Growth (YoY)"}
+        has_growth = False
+        for index, heading in enumerate(period_headings):
+            value = revenue_row.get(heading)
+            previous = revenue_row.get(period_headings[index + lag]) if index + lag < len(period_headings) else None
+            growth = (value / previous - 1.0) if value is not None and previous not in (None, 0) else None
+            growth_row[heading] = growth
+            has_growth = has_growth or growth is not None
+        if has_growth:
+            rows.insert(1, growth_row)
     return pd.DataFrame(rows)
 
 
+def financial_table(frame):
+    headers = "".join(f"<th>{escape(str(column))}</th>" for column in frame.columns)
+    body = ""
+    for _, row in frame.iterrows():
+        label = str(row["Line Item"])
+        cells = [f"<td>{escape(label)}</td>"]
+        for column in frame.columns[1:]:
+            value = row[column]
+            if value is None or pd.isna(value):
+                text = "Data unavailable"
+            elif "Growth" in label:
+                text = f"{float(value):+.1%}"
+            elif "EPS" in label:
+                text = format_price(value)
+            else:
+                text = fmt_big(value)
+            cells.append(f"<td>{escape(text)}</td>")
+        body += f"<tr>{''.join(cells)}</tr>"
+    st.markdown(
+        f"<div class='financial-statement-scroll'><table class='financial-statement'>"
+        f"<thead><tr>{headers}</tr></thead><tbody>{body}</tbody></table></div>",
+        unsafe_allow_html=True,
+    )
+
+
 def render_financial_statements():
-    financials_chart()
     frequency = st.radio("Reporting frequency", ["Annual", "Quarterly"], horizontal=True, key=f"statement_frequency_{ticker}")
-    statements = get_financial_statements(ticker, quarterly=frequency == "Quarterly")
+    quarterly = frequency == "Quarterly"
+    statements = get_financial_statements(ticker, quarterly=quarterly)
     tabs = st.tabs(list(STATEMENT_LINES))
     keys = {"Income Statement": "income", "Balance Sheet": "balance", "Cash Flow Statement": "cashflow"}
     for tab, name in zip(tabs, STATEMENT_LINES):
         with tab:
-            frame = statement_display_frame(statements[keys[name]], STATEMENT_LINES[name])
+            frame = statement_display_frame(statements[keys[name]], STATEMENT_LINES[name], quarterly=quarterly)
             if frame.empty:
                 st.info("Data unavailable for this statement and reporting frequency.")
             else:
-                display = frame.copy()
-                for column in display.columns[1:]:
-                    if name == "Income Statement" and display.iloc[:, 0].eq("Diluted EPS").any():
-                        display[column] = [fmt_x(value) if label == "Diluted EPS" else fmt_big(value) for label, value in zip(display["Line Item"], display[column])]
-                    else:
-                        display[column] = display[column].map(fmt_big)
-                st.dataframe(display, hide_index=True, width="stretch")
+                financial_table(frame)
     st.caption("Reported figures from Yahoo Finance via yfinance. Missing line items are omitted rather than estimated.")
+    with st.expander("Financial Trends", expanded=False):
+        financials_chart()
 
 
 def derived_analysis(info, dcf_values):
@@ -1624,10 +1692,27 @@ def derived_analysis(info, dcf_values):
     return strengths, risks, drivers, valuation
 
 
+def render_company_description(description, key):
+    """Keep sourced descriptions readable without discarding the full provider text."""
+    if not description:
+        st.markdown("<div class='company-description'>Data unavailable</div>", unsafe_allow_html=True)
+        return
+    clean = str(description).strip()
+    preview_limit = 620
+    preview = clean
+    needs_expander = len(clean) > 340
+    if len(clean) > preview_limit:
+        preview = clean[:preview_limit].rsplit(" ", 1)[0] + "…"
+    st.markdown(f"<div class='company-description'>{escape(preview)}</div>", unsafe_allow_html=True)
+    if needs_expander:
+        with st.expander("Show full company description", expanded=False):
+            st.write(clean)
+
+
 def render_company_analysis(info):
     description = g(info, "longBusinessSummary")
     st.markdown("#### Sourced company information")
-    st.markdown(f"<div class='panel'><p class='small-muted'>{escape(description) if description else 'Data unavailable'}</p></div>", unsafe_allow_html=True)
+    render_company_description(description, "analysis")
     research_note_block()
     dcf_values = default_dcf_snapshot(info)
     strengths, risks, drivers, valuation = derived_analysis(info, dcf_values)
@@ -1680,34 +1765,59 @@ def render_relative_valuation(info):
 
 def render_risk_performance(info):
     history = get_stock_data(ticker, "5y", "1d")
-    if history.empty or "Close" not in history:
-        st.info("Data unavailable for risk and performance calculations.")
+    benchmark_history = get_stock_data("^GSPC", "5y", "1d")
+    if history.empty or benchmark_history.empty or "Close" not in history or "Close" not in benchmark_history:
+        st.info("Company or S&P 500 data is unavailable for matched-period risk calculations.")
         return
-    close = history["Close"].dropna()
+    aligned = align_price_series(history["Close"], benchmark_history["Close"], ticker, "S&P 500")
+    if len(aligned) < 20:
+        st.info("Insufficient overlapping company and S&P 500 history for comparison.")
+        return
     risk_free = get_risk_free_rate()
-    stats = risk_statistics(close, risk_free)
-    stat_grid("Risk & Return Snapshot", [
+    company_stats = risk_statistics(aligned[ticker], risk_free)
+    benchmark_stats = risk_statistics(aligned["S&P 500"], risk_free)
+    stat_grid("Additional Company Risk", [
         ("Beta", fmt_x(g(info, "beta"))),
-        ("Annualized volatility", percent_value(stats["annualized_volatility"])),
-        ("Maximum drawdown", percent_value(stats["maximum_drawdown"], signed=True)),
-        ("1Y return", percent_value(stats["return_1y"], signed=True)),
-        ("3Y return", percent_value(stats["return_3y"], signed=True)),
-        ("Sharpe ratio", fmt_x(stats["sharpe_ratio"])),
-        ("Downside volatility", percent_value(stats["downside_volatility"])),
+        ("Downside volatility", percent_value(company_stats["downside_volatility"])),
+        ("Measurement period", f"{aligned.index.min():%b %Y}–{aligned.index.max():%b %Y}"),
     ])
-    returns = close.pct_change(fill_method=None).dropna()
-    cumulative = close / close.iloc[0] * 100
-    drawdown = close / close.cummax() - 1
-    rolling_vol = returns.rolling(63).std() * (252 ** 0.5)
+    comparison_rows = []
+    metric_map = [
+        ("1Y Return", "return_1y", True),
+        ("3Y Return", "return_3y", True),
+        ("Annualized Volatility", "annualized_volatility", False),
+        ("Maximum Drawdown", "maximum_drawdown", True),
+    ]
+    for label, key, signed in metric_map:
+        comparison_rows.append({
+            "Metric": label,
+            selected_company: percent_value(company_stats[key], signed=signed),
+            "S&P 500": percent_value(benchmark_stats[key], signed=signed),
+        })
+    comparison_rows.append({
+        "Metric": "Sharpe Ratio",
+        selected_company: fmt_x(company_stats["sharpe_ratio"]),
+        "S&P 500": fmt_x(benchmark_stats["sharpe_ratio"]),
+    })
+    st.markdown("#### Matched-period benchmark comparison")
+    st.dataframe(pd.DataFrame(comparison_rows), hide_index=True, width="stretch")
+    st.caption("Both columns use the same overlapping trading dates, daily-return methodology and annual risk-free rate.")
+
+    returns = aligned.pct_change(fill_method=None).dropna()
+    cumulative = aligned.divide(aligned.iloc[0]).multiply(100)
+    drawdown = aligned.divide(aligned.cummax()).subtract(1).multiply(100)
+    rolling_vol = returns.rolling(63).std().multiply(252 ** 0.5).multiply(100)
     tab1, tab2, tab3 = st.tabs(["Cumulative Return", "Drawdown", "Rolling Volatility"])
     charts = [
-        (tab1, cumulative, "Growth of $100", BLUE_LT, "Index"),
-        (tab2, drawdown * 100, "Drawdown", RED, "%"),
-        (tab3, rolling_vol * 100, "63-day Rolling Annualized Volatility", ORANGE, "%"),
+        (tab1, cumulative, "Growth of $100", "Index"),
+        (tab2, drawdown, "Drawdown", "%"),
+        (tab3, rolling_vol, "63-day Rolling Annualized Volatility", "%"),
     ]
-    for tab, series, name, color, y_title in charts:
+    for tab, frame, name, y_title in charts:
         with tab:
-            fig = go.Figure(go.Scatter(x=series.index, y=series, mode="lines", name=name, line=dict(color=color, width=2)))
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(x=frame.index, y=frame[ticker], mode="lines", name=selected_company, line=dict(color=BLUE_LT, width=2.2)))
+            fig.add_trace(go.Scatter(x=frame.index, y=frame["S&P 500"], mode="lines", name="S&P 500", line=dict(color=ORANGE, width=1.8)))
             fig.update_layout(template="plotly_dark", height=330, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font=dict(color=TEXT, family="Inter"), margin=dict(l=10, r=10, t=20, b=10), yaxis_title=y_title)
             fig.update_xaxes(gridcolor="rgba(255,255,255,0.05)")
             fig.update_yaxes(gridcolor="rgba(255,255,255,0.05)")
@@ -1716,15 +1826,60 @@ def render_risk_performance(info):
         st.markdown(
             "- **Beta:** provider-reported sensitivity to market movements.\n"
             "- **Annualized volatility:** standard deviation of daily returns × √252.\n"
-            "- **Maximum drawdown:** largest peak-to-trough decline in the available five-year series.\n"
+            "- **Maximum drawdown:** largest peak-to-trough decline during the matched measurement period.\n"
             "- **Sharpe ratio:** annualized excess daily return divided by annualized volatility, using the current 10-year Treasury proxy.\n"
             "- **Downside volatility:** annualized standard deviation of negative daily returns."
         )
 
 
+def peer_group_selection():
+    universe = get_company_metrics(list(COMPANIES))
+    options = []
+    if selected_company in MEGA_CAP_TECH:
+        options.append("Mega-Cap Technology")
+    options.extend(["Sector Peers", "Similar Market Cap", "Curated Coverage Peers"])
+    group = st.selectbox("Peer group", options, key=f"peer_group_{ticker}")
+
+    selected_row = universe[universe["Company"] == selected_company]
+    if group == "Mega-Cap Technology":
+        names = MEGA_CAP_TECH
+        explanation = "Selected from the dashboard’s five mega-cap technology platforms for broad business-model and valuation context; these are not all direct operating competitors."
+    elif group == "Sector Peers" and not selected_row.empty and pd.notna(selected_row.iloc[0]["Sector"]):
+        sector = selected_row.iloc[0]["Sector"]
+        candidates = universe[universe["Sector"] == sector].copy()
+        target_cap = selected_row.iloc[0]["Market Cap"]
+        if pd.notna(target_cap) and target_cap:
+            candidates["Distance"] = (pd.to_numeric(candidates["Market Cap"], errors="coerce") - target_cap).abs() / target_cap
+            candidates = candidates.sort_values("Distance")
+        names = candidates["Company"].head(5).tolist()
+        explanation = f"Selected from companies classified by Yahoo Finance in the {sector} sector, limited to this dashboard’s 19-security universe and ordered by market-cap proximity where available."
+    elif group == "Similar Market Cap" and not selected_row.empty and pd.notna(selected_row.iloc[0]["Market Cap"]):
+        target_cap = selected_row.iloc[0]["Market Cap"]
+        candidates = universe[pd.to_numeric(universe["Market Cap"], errors="coerce").notna()].copy()
+        candidates["Distance"] = (candidates["Market Cap"] - target_cap).abs() / target_cap
+        names = candidates.sort_values("Distance")["Company"].head(5).tolist()
+        explanation = "Selected from the dashboard’s 19-security universe by smallest percentage difference in reported market capitalization. Similar size does not imply similar operations."
+    else:
+        names = [selected_company, *PEER_GROUPS.get(selected_company, [])]
+        explanation = "A manually curated comparison set from the existing coverage universe, chosen for overlapping markets, business economics or investor context."
+
+    if selected_company not in names:
+        names = [selected_company, *names]
+    names = list(dict.fromkeys(names))[:5]
+    if len(names) < 2:
+        names = [selected_company, *PEER_GROUPS.get(selected_company, [])][:5]
+        explanation += " Fewer than two sector matches were available, so the curated coverage set is used as a fallback."
+    return group, names, explanation, universe
+
+
 def render_peer_comparison():
-    peer_names = [selected_company, *PEER_GROUPS.get(selected_company, [])]
-    metrics = get_company_metrics(peer_names)
+    group, peer_names, explanation, universe = peer_group_selection()
+    st.markdown(f"#### {group} Comparison")
+    st.caption(explanation)
+    metrics = universe[universe["Company"].isin(peer_names)].copy()
+    order = {name: index for index, name in enumerate(peer_names)}
+    metrics["_order"] = metrics["Company"].map(order)
+    metrics = metrics.sort_values("_order").drop(columns="_order")
     history = get_peer_price_history(peer_names)
     if not history.empty:
         fig = go.Figure()
@@ -1769,14 +1924,26 @@ def render_company_profile(info):
     stat_grid("Company Facts", fields)
     st.markdown("#### Business description")
     description = g(info, "longBusinessSummary")
-    st.markdown(f"<div class='panel'><p class='small-muted'>{escape(description) if description else 'Data unavailable'}</p></div>", unsafe_allow_html=True)
+    render_company_description(description, "profile")
     st.caption("Factual company fields and description are supplied by Yahoo Finance via yfinance.")
+
+
+def render_formula_cards(cards):
+    html = ""
+    for name, formula, explanation in cards:
+        html += (
+            "<div class='formula-card'>"
+            f"<div class='name'>{escape(name)}</div>"
+            f"<div class='formula'>{escape(formula)}</div>"
+            f"<div class='explain'>{escape(explanation)}</div></div>"
+        )
+    st.markdown(f"<div class='formula-grid'>{html}</div>", unsafe_allow_html=True)
 
 
 def render_research_universe(comparison):
     fundamentals = get_company_metrics(list(COMPANIES))[["Company", "Market Cap"]]
     universe = comparison.merge(fundamentals, on="Company", how="left")
-    f1, f2, f3 = st.columns(3)
+    f1, f2, f3, f4, f5 = st.columns([1.35, 1.0, 1.25, 0.75, 0.75])
     with f1:
         categories = st.multiselect("Category", sorted(universe["Category"].dropna().unique()), key="universe_category")
     with f2:
@@ -1784,10 +1951,13 @@ def render_research_universe(comparison):
     with f3:
         market_band = st.selectbox("Market cap", ["All", "Mega / Large (≥$200B)", "Mid ($10B–$200B)", "Small (<$10B)"], key="universe_market_cap")
     performance_values = pd.to_numeric(universe["1Y Return %"], errors="coerce").dropna()
-    performance_filter = None
+    performance_min, performance_max = None, None
     if not performance_values.empty:
         low, high = float(performance_values.min()), float(performance_values.max())
-        performance_filter = st.slider("Up to 1Y performance (%)", low, high, (low, high), key="universe_performance")
+        with f4:
+            performance_min = st.number_input("Min 1Y return %", value=round(low, 1), step=5.0, key="universe_performance_min")
+        with f5:
+            performance_max = st.number_input("Max 1Y return %", value=round(high, 1), step=5.0, key="universe_performance_max")
     filtered = universe.copy()
     if categories:
         filtered = filtered[filtered["Category"].isin(categories)]
@@ -1799,8 +1969,9 @@ def render_research_universe(comparison):
         filtered = filtered[(filtered["Market Cap"] >= 10e9) & (filtered["Market Cap"] < 200e9)]
     elif market_band.startswith("Small"):
         filtered = filtered[filtered["Market Cap"] < 10e9]
-    if performance_filter:
-        filtered = filtered[pd.to_numeric(filtered["1Y Return %"], errors="coerce").between(*performance_filter)]
+    if performance_min is not None and performance_max is not None:
+        lower, upper = sorted((performance_min, performance_max))
+        filtered = filtered[pd.to_numeric(filtered["1Y Return %"], errors="coerce").between(lower, upper)]
     st.markdown("#### Speculative Coverage")
     st.caption("Higher-risk research names, not investment recommendations.")
     speculative = comparison[comparison["Company"].isin(SLEEPER_STOCKS)]
@@ -2422,28 +2593,22 @@ with st.container(key="mobile_section_nav"):
 
 page = st.session_state["active_page"]
 
-st.markdown(
-    """
-    <div class="product-head">
-        <div class="identity">
+# =============================================================
+# APPLICATION HEADER + GLOBAL SECURITY SELECTOR
+# =============================================================
+with st.container(key="application_header"):
+    header_identity, header_selector = st.columns([3.0, 1.35])
+    with header_identity:
+        st.markdown(
+            """<div class="product-head"><div class="identity">
             <div class="product-mark">ER</div>
             <div><div class="product-name">Equity Research Dashboard</div>
-            <div class="product-sub">Market Data · Fundamental Analysis · Valuation · Quantitative Research</div></div>
-        </div>
-        <div class="product-byline">Built by Garrett Ewy</div>
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
-
-# =============================================================
-# GLOBAL SECURITY SELECTOR
-# =============================================================
-with st.container(key="security_selector"):
-    selector_label, selector_control = st.columns([3.2, 1.25])
-    with selector_label:
-        st.markdown("<div class='ticker-selector-label'>Selected security</div>", unsafe_allow_html=True)
-    with selector_control:
+            <div class="product-sub">Market Data · Fundamental Analysis · Valuation · Quantitative Research</div>
+            <div class="product-byline">Built by Garrett Ewy</div></div></div></div>""",
+            unsafe_allow_html=True,
+        )
+    with header_selector:
+        st.markdown("<div class='header-selector-label'>Security</div>", unsafe_allow_html=True)
         selected_company = st.selectbox(
             "Company / Ticker",
             list(COMPANIES.keys()),
@@ -2558,7 +2723,8 @@ elif page == "Monte Carlo — Coming Soon":
     st.markdown(
         """<div class="panel" style="min-height:260px;display:flex;flex-direction:column;justify-content:center;align-items:flex-start;">
         <div class="eyebrow">FUTURE MODULE</div><h3 style="margin:.45rem 0;">Coming Soon</h3>
-        <p class="small-muted">Future quantitative module for probabilistic price simulations and risk analysis.</p>
+        <p class="small-muted">Future quantitative module for probabilistic price paths, ending-price distributions, downside percentiles and probability analysis.</p>
+        <p class="small-muted" style="margin-top:8px;">Monte Carlo simulations depend on model assumptions and are not price predictions.</p>
         </div>""",
         unsafe_allow_html=True,
     )
@@ -2593,6 +2759,18 @@ TTM fields such as revenue, free cash flow and net income use provider-reported 
 
 Bear, Base and Bull cases are mechanical spreads around transparent defaults. They are estimates, not price targets or recommendations."""
         )
+        render_formula_cards([
+            (
+                "FCFF used by this application",
+                "Levered FCF = Yahoo FCF; fallback OCF − |CapEx|  ·  FCFF = Levered FCF + |Interest| × (1 − Tax Rate)",
+                "The Yahoo Finance Free Cash Flow statement field is used when present. If absent, the code uses operating cash flow less the absolute value of capital expenditure. After-tax absolute interest expense is then added back. The reported effective tax rate is capped between 0% and 35%; 21% is used when a positive pretax-income rate cannot be calculated.",
+            ),
+            (
+                "Terminal Value · Gordon Growth",
+                "TV = FCFF(n+1) / (WACC − g)",
+                "The final forecast-year FCFF grows once by the terminal rate, then is capitalized as a perpetuity and discounted to present value. WACC must be greater than terminal growth.",
+            ),
+        ])
     with quant_tab:
         st.markdown(
             """#### Multiples
@@ -2605,6 +2783,23 @@ Trailing and forward P/E, PEG, EV/EBITDA, Price/Sales and Price/Book are provide
 - Downside volatility annualizes the standard deviation of negative daily returns.
 - Peer performance rebases each valid series to 100 at its first observation."""
         )
+        render_formula_cards([
+            (
+                "Annualized Volatility",
+                "σ annual = σ daily × √252",
+                "The application takes the sample standard deviation of daily percentage returns and annualizes it using 252 trading days.",
+            ),
+            (
+                "Sharpe Ratio",
+                "Sharpe = (Annualized Asset Return − Annual Risk-Free Rate) / Annualized Volatility",
+                "Annualized asset return is mean daily return × 252. The risk-free input is the current annual 10-year Treasury proxy, and volatility is annualized from the same daily returns.",
+            ),
+            (
+                "Maximum Drawdown",
+                "MDD = min[ Price(t) / Running Peak(t) − 1 ]",
+                "This is the largest peak-to-trough percentage decline during the selected matched measurement period.",
+            ),
+        ])
     with limits_tab:
         st.markdown(
             """#### Limitations

@@ -158,3 +158,16 @@ def risk_statistics(close: pd.Series, annual_risk_free_rate: float = 0.0) -> dic
         "return_1y": trailing_return(252),
         "return_3y": trailing_return(756),
     }
+
+
+def align_price_series(left: pd.Series, right: pd.Series, left_name: str, right_name: str) -> pd.DataFrame:
+    """Return two numeric price series on identical, non-missing dates."""
+    aligned = pd.concat(
+        [
+            pd.to_numeric(left, errors="coerce").rename(left_name),
+            pd.to_numeric(right, errors="coerce").rename(right_name),
+        ],
+        axis=1,
+        join="inner",
+    )
+    return aligned.dropna()

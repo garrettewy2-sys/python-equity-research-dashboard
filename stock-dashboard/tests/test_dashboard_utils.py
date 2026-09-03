@@ -3,6 +3,7 @@ import unittest
 import pandas as pd
 
 from dashboard_utils import (
+    align_price_series,
     debt_to_equity_ratio,
     dividend_yield_percent,
     equal_weight_index,
@@ -82,6 +83,13 @@ class DashboardUtilsTests(unittest.TestCase):
         self.assertLess(stats["maximum_drawdown"], 0)
         self.assertIsNotNone(stats["return_1y"])
         self.assertIsNotNone(stats["return_3y"])
+
+    def test_align_price_series_uses_only_shared_non_missing_dates(self):
+        left = pd.Series([100.0, 101.0, None], index=pd.date_range("2026-01-01", periods=3))
+        right = pd.Series([200.0, 201.0, 202.0], index=pd.date_range("2026-01-02", periods=3))
+        aligned = align_price_series(left, right, "Company", "Benchmark")
+        self.assertEqual(list(aligned.index), [pd.Timestamp("2026-01-02")])
+        self.assertEqual(list(aligned.columns), ["Company", "Benchmark"])
 
 
 if __name__ == "__main__":
