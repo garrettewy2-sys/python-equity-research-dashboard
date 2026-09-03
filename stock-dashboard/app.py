@@ -1,5 +1,7 @@
 import logging
+from datetime import datetime
 from html import escape
+from zoneinfo import ZoneInfo
 
 import streamlit as st
 import yfinance as yf
@@ -48,18 +50,18 @@ st.set_page_config(
 )
  
 # ---- Color tokens (used in Python logic / Plotly / SVG) ----
-BG_DEEP   = "#07111f"
-CARD      = "#0f1b2d"
-BORDER    = "rgba(255,255,255,0.08)"
-BLUE      = "#3b82f6"
-BLUE_LT   = "#60a5fa"
-BLUE_DARK = "#1d4ed8"
-TEXT      = "#e5eefc"
-MUTED     = "#94a3b8"
-GREEN     = "#22c55e"
-RED       = "#ef4444"
-ORANGE    = "#f59e0b"
-PURPLE    = "#a78bfa"
+BG_DEEP   = "#f7f9fc"
+CARD      = "#ffffff"
+BORDER    = "#dfe5ed"
+BLUE      = "#1769e0"
+BLUE_LT   = "#2f7df4"
+BLUE_DARK = "#0b5bd3"
+TEXT      = "#13213d"
+MUTED     = "#687892"
+GREEN     = "#0f9f6e"
+RED       = "#dc2626"
+ORANGE    = "#64748b"
+PURPLE    = "#2563eb"
  
 # =============================================================
 # GLOBAL CSS
@@ -634,6 +636,369 @@ st.markdown(
         .security-price { font-size:24px; }
         .stat-grid, .dcf-result-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
     }
+
+    /* =========================================================
+       White institutional dashboard reconstruction
+       The attached light mockup is the visual source of truth.
+       ========================================================= */
+    :root {
+        --ei-bg:#f7f9fc;
+        --ei-surface:#ffffff;
+        --ei-surface-raised:#ffffff;
+        --ei-soft:#f8fafc;
+        --ei-soft-blue:#eef5ff;
+        --ei-border:#dfe5ed;
+        --ei-border-strong:#cbd5e1;
+        --ei-text:#13213d;
+        --ei-muted:#687892;
+        --ei-accent:#1769e0;
+        --ei-positive:#0f9f6e;
+        --ei-negative:#dc2626;
+        --ei-radius-sm:6px;
+        --ei-radius-md:8px;
+        --ei-shadow:0 1px 3px rgba(15,31,61,.055), 0 1px 2px rgba(15,31,61,.03);
+    }
+
+    html, body, [class*="css"], .stApp, [data-testid="stSidebar"] {
+        font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+    }
+    html, body, .stApp, [data-testid="stAppViewContainer"], [data-testid="stMain"] {
+        background:var(--ei-bg) !important; color:var(--ei-text) !important;
+    }
+    [data-testid="stHeader"] { background:transparent !important; height:0 !important; }
+    [data-testid="stToolbar"], [data-testid="stDecoration"] { display:none !important; }
+    .block-container {
+        width:100%; max-width:1600px; padding:0 16px 32px !important;
+    }
+    .block-container > [data-testid="stVerticalBlock"] { gap:12px !important; }
+    .block-container > [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"]:has(style) { display:none !important; }
+    h1, h2, h3, h4, h5, h6,
+    p, span, label, li, div { color:var(--ei-text); }
+    h1, h2, h3, h4 { font-weight:700 !important; letter-spacing:-.25px; }
+    h4 { font-size:14px !important; }
+    .small-muted, .stCaption, [data-testid="stCaptionContainer"],
+    [data-testid="stCaptionContainer"] p { color:var(--ei-muted) !important; font-size:10.5px !important; }
+    hr { border-color:var(--ei-border) !important; }
+
+    /* Main top bar */
+    .st-key-application_header {
+        position:sticky; top:0; z-index:990; min-height:44px; height:44px; box-sizing:border-box; overflow:visible;
+        margin:0 -16px 0 !important; padding:5px 16px !important;
+        background:rgba(255,255,255,.98); border-bottom:1px solid var(--ei-border) !important;
+        box-shadow:none;
+    }
+    .st-key-application_header [data-testid="stHorizontalBlock"] {
+        align-items:center !important; gap:8px !important; flex-wrap:nowrap !important;
+    }
+    .st-key-application_header [data-testid="stColumn"] { min-width:0 !important; }
+    .header-ticker-chip {
+        height:30px; display:flex; align-items:center; justify-content:center; gap:7px;
+        padding:0 9px; border:1px solid var(--ei-border); border-radius:6px;
+        background:#fff; color:var(--ei-text); font-size:11px; font-weight:650;
+    }
+    .header-ticker-chip .glyph { font-size:13px; color:#0f172a; }
+    .header-market-time { color:var(--ei-muted); font-size:9.5px; text-align:right; white-space:nowrap; }
+    .header-market-time .live-dot { color:var(--ei-positive); font-size:9px; margin-left:4px; }
+    .header-actions { display:flex; align-items:center; justify-content:flex-end; gap:13px; }
+    .header-action {
+        width:24px; height:24px; display:grid; place-items:center; border:0;
+        background:transparent; color:#263754; font-size:15px; line-height:1;
+    }
+    .header-avatar {
+        width:28px; height:28px; display:grid; place-items:center; border-radius:50%;
+        background:#f1f5f9; border:1px solid var(--ei-border); color:#475569;
+        font-size:9px; font-weight:650;
+    }
+    .header-chevron { color:#64748b; font-size:12px; }
+    .header-selector-label { display:none; }
+
+    /* Sidebar */
+    [data-testid="stSidebar"] {
+        background:#fff !important; border-right:1px solid var(--ei-border) !important;
+        box-shadow:none !important;
+    }
+    [data-testid="stSidebarContent"] { padding:0 !important; }
+    [data-testid="stSidebarHeader"] { display:none !important; }
+    [data-testid="stSidebarUserContent"] {
+        box-sizing:border-box; width:100% !important; padding:5px 4px 110px !important;
+    }
+    [data-testid="stSidebar"] .sb-brand {
+        display:flex; align-items:center; gap:8px; margin:0 0 8px !important;
+        padding:4px 0 !important; background:transparent !important;
+        border:0 !important; border-radius:0 !important;
+    }
+    [data-testid="stSidebar"] .sb-brand .mark {
+        width:20px; height:20px; border:0; background:transparent;
+        color:var(--ei-accent); font-size:17px; font-weight:800;
+    }
+    [data-testid="stSidebar"] .sb-brand .t {
+        color:var(--ei-text) !important; font-size:12px !important; font-weight:700;
+        letter-spacing:-.2px; white-space:nowrap;
+    }
+    [data-testid="stSidebar"] .sb-brand .t .accent { color:var(--ei-accent); }
+    [data-testid="stSidebar"] .sb-brand .s { display:none; }
+    [data-testid="stSidebar"] .nav-title {
+        margin:15px 0 6px 4px !important; color:#7a879b !important;
+        font-size:8px !important; font-weight:700; letter-spacing:.85px !important;
+    }
+    [data-testid="stSidebar"] div[role="radiogroup"] { gap:1px !important; }
+    [data-testid="stSidebar"] div[role="radiogroup"] label {
+        position:relative; min-height:29px; padding:6px 8px !important; margin:0 !important;
+        color:#263754 !important; background:transparent !important;
+        border:1px solid transparent !important; border-left:2px solid transparent !important;
+        border-radius:6px !important; font-size:9.5px !important; font-weight:500 !important;
+        box-shadow:none !important; transform:none !important;
+    }
+    [data-testid="stSidebar"] div[role="radiogroup"] label::before {
+        content:'◉'; width:15px; flex:0 0 15px; color:#40516d;
+        font-size:10px; font-weight:500; text-align:center; margin-right:5px;
+    }
+    [data-testid="stSidebar"] div[role="radiogroup"] label:hover {
+        background:#f8fafc !important; border-color:#edf1f5 !important;
+    }
+    [data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
+        color:var(--ei-accent) !important; background:var(--ei-soft-blue) !important;
+        border-color:#d7e7ff !important; border-left:2px solid var(--ei-accent) !important;
+    }
+    [data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked)::before { color:var(--ei-accent); }
+    [data-testid="stSidebar"] div[role="radiogroup"] label p {
+        color:inherit !important; font-size:9.5px !important; white-space:nowrap !important;
+    }
+    [data-testid="stSidebar"] div[role="radiogroup"] label::after { display:none !important; }
+    .sidebar-author {
+        position:fixed; left:9px; bottom:38px; width:180px; padding:10px 12px;
+        background:#fff; border:1px solid var(--ei-border); border-radius:7px;
+        box-shadow:var(--ei-shadow); z-index:5;
+    }
+    .sidebar-author .row { display:flex; align-items:flex-start; gap:9px; }
+    .sidebar-author .icon { color:var(--ei-accent); font-size:16px; line-height:1.2; }
+    .sidebar-author .name { color:#4b5d78; font-size:9px; font-weight:500; }
+    .sidebar-author .role { color:#5f7089; font-size:9px; margin-top:5px; }
+    .sidebar-author .version { color:#77869b; font-size:8px; margin-top:10px; }
+
+    /* Page and company headers */
+    .page-head { margin:2px 0 7px !important; gap:6px 14px; }
+    .page-head .title { color:var(--ei-text) !important; font-size:18px !important; font-weight:700 !important; }
+    .page-head .sub { color:var(--ei-muted) !important; font-size:10px !important; }
+    .security-header {
+        grid-template-columns:minmax(0,1.6fr) minmax(220px,.7fr); gap:16px;
+        height:78px; min-height:0; box-sizing:border-box; margin:0 0 2px; padding:10px 12px;
+        background:#fff; border:1px solid var(--ei-border); border-radius:8px;
+        box-shadow:var(--ei-shadow);
+    }
+    .security-id { gap:14px; }
+    .security-symbol {
+        min-width:56px; width:56px; height:56px; padding:0; border-radius:7px;
+        background:#fff; border:1px solid var(--ei-border); color:#0f172a;
+        font-size:12px; box-shadow:0 1px 2px rgba(15,31,61,.04);
+    }
+    .security-name { color:var(--ei-text); font-size:20px; font-weight:700; }
+    .security-name .ticker-badge {
+        display:inline-flex; vertical-align:3px; margin-left:8px; padding:2px 7px;
+        border-radius:4px; background:#f8fafc; border:1px solid var(--ei-border);
+        color:#53627a; font-size:9px; font-weight:600;
+    }
+    .security-meta { color:var(--ei-muted); font-size:9.5px; margin-top:7px; }
+    .security-price { color:var(--ei-text); font-size:24px; font-weight:700; }
+    .security-change { margin-top:3px; font-size:11px; font-weight:650; }
+    .security-stamp { color:var(--ei-muted); font-size:8.5px; margin-top:5px; line-height:1.35; }
+
+    /* White card system */
+    .sum-card, .panel, .thesis-box, .dcf-result, .dcf-assumption,
+    [data-testid="stVerticalBlockBorderWrapper"], .dtab-wrap, .terminal,
+    .research-note, .company-description, .formula-card {
+        background:#fff !important; color:var(--ei-text) !important;
+        border:1px solid var(--ei-border) !important; border-radius:7px !important;
+        box-shadow:var(--ei-shadow) !important;
+    }
+    .panel { padding:11px 12px; margin-bottom:7px; }
+    .panel h4 { color:var(--ei-text) !important; margin:0 0 9px; font-size:12px !important; font-weight:700 !important; }
+    [data-testid="stVerticalBlockBorderWrapper"] { padding:0 !important; }
+    [data-testid="stVerticalBlockBorderWrapper"] > div { gap:8px !important; }
+    .sum-card { padding:11px 12px; }
+    .sum-card:hover { transform:none !important; border-color:var(--ei-border-strong) !important; }
+    .sum-card .label { color:var(--ei-muted); font-size:8.5px; letter-spacing:.35px; }
+    .sum-card .value { color:var(--ei-text); font-size:18px; }
+    .sum-card .sub { font-size:9px; }
+    .stat-grid { gap:8px; }
+    .stat {
+        min-height:50px; padding:8px 10px; background:#fff;
+        border:1px solid #e6ebf1; border-radius:6px;
+    }
+    .stat .k { color:var(--ei-muted); font-size:8px; font-weight:500; letter-spacing:0; text-transform:none; }
+    .stat .v { color:var(--ei-text); font-size:14px; font-weight:700; margin-top:5px; }
+    .pos { color:var(--ei-positive) !important; }
+    .neg { color:var(--ei-negative) !important; }
+    .neutral { color:var(--ei-muted) !important; }
+
+    /* DCF cards */
+    .dcf-preview-head { margin:10px 0 6px; }
+    .dcf-preview-head .t { color:var(--ei-text); font-size:15px; font-weight:700; }
+    .dcf-preview-head .b {
+        color:var(--ei-accent); background:var(--ei-soft-blue); border-color:#d7e7ff;
+        border-radius:999px; padding:3px 7px; font-size:8px;
+    }
+    .dcf-result-grid { gap:8px; margin-bottom:8px; }
+    .dcf-result { min-height:62px; padding:10px 11px; text-align:center; }
+    .dcf-result .k { color:var(--ei-muted); font-size:8px; font-weight:500; text-transform:none; letter-spacing:0; }
+    .dcf-result .v { color:var(--ei-accent); font-size:17px; font-weight:700; margin-top:6px; }
+    .dcf-result:nth-child(2) .v { color:var(--ei-negative); }
+    .dcf-result:nth-child(4) .v { color:var(--ei-positive); }
+    .dcf-assumption { padding:8px 10px; background:#fff !important; }
+    .dcf-assumption .k, .dcf-mini-note, .dcf-reverse .k, .dcf-source .k { color:var(--ei-muted); }
+    .dcf-assumption .v, .dcf-reverse .v, .dcf-source .v { color:var(--ei-text); }
+    .dcf-reverse { background:#f8fafc; border:1px solid var(--ei-border); border-radius:6px; }
+    .dcf-source { border-bottom-color:var(--ei-border); }
+
+    /* Tables */
+    .dtab-wrap { overflow:auto; }
+    .dtab { background:#fff; color:var(--ei-text); font-size:9.5px; }
+    .dtab thead th {
+        background:#f8fafc; color:#66758d; font-size:8px; font-weight:600;
+        text-transform:none; letter-spacing:0; padding:7px 9px;
+        border-bottom:1px solid var(--ei-border);
+    }
+    .dtab tbody td {
+        color:var(--ei-text); font-size:9px; padding:6px 9px;
+        border-bottom:1px solid #edf1f5;
+    }
+    .dtab tbody tr:hover td { background:#f8fbff; }
+    .wl th { color:var(--ei-muted); border-bottom-color:var(--ei-border); font-size:8px; padding:6px; }
+    .wl td { color:var(--ei-text); border-bottom-color:#edf1f5; font-size:9.5px; padding:6px; }
+    .wl td:first-child { color:var(--ei-text); }
+    [data-testid="stDataFrame"] {
+        background:#fff !important; border:1px solid var(--ei-border) !important;
+        border-radius:6px !important; box-shadow:none !important; overflow:hidden;
+    }
+    [data-testid="stDataFrame"] button { color:#64748b !important; background:transparent !important; }
+    .financial-statement-scroll { border-color:var(--ei-border); border-radius:6px; background:#fff; }
+    .financial-statement th, .financial-statement td {
+        color:var(--ei-text); border-bottom-color:#edf1f5; font-size:9.5px; padding:7px 9px;
+    }
+    .financial-statement th { color:var(--ei-muted); background:#f8fafc; font-size:8px; }
+    .financial-statement th:first-child, .financial-statement td:first-child {
+        background:#fff; box-shadow:1px 0 0 var(--ei-border);
+    }
+    .financial-statement td:first-child { color:var(--ei-text); }
+
+    /* Controls, tabs and alerts */
+    div[data-baseweb="select"] > div,
+    div[data-baseweb="input"] > div,
+    .stSelectbox div[data-baseweb="select"] > div,
+    .stTextInput div[data-baseweb="input"] > div,
+    [data-testid="stNumberInput"] > div > div {
+        min-height:30px !important; background:#fff !important; color:var(--ei-text) !important;
+        border:1px solid var(--ei-border) !important; border-radius:6px !important;
+        box-shadow:none !important;
+    }
+    div[data-baseweb="select"] *, div[data-baseweb="input"] input { color:var(--ei-text) !important; font-size:10px !important; }
+    div[data-baseweb="select"] svg { fill:#708096 !important; color:#708096 !important; }
+    div[data-baseweb="popover"] ul, div[data-baseweb="menu"], ul[role="listbox"] {
+        background:#fff !important; border:1px solid var(--ei-border) !important; box-shadow:0 8px 20px rgba(15,31,61,.12) !important;
+    }
+    div[data-baseweb="popover"] li, ul[role="listbox"] li { color:var(--ei-text) !important; font-size:10px !important; }
+    div[data-baseweb="popover"] li:hover, ul[role="listbox"] li:hover { background:var(--ei-soft-blue) !important; }
+    [data-testid="stWidgetLabel"] p { color:#516078 !important; font-size:8.5px !important; font-weight:500 !important; }
+    .stButton button, .stDownloadButton button {
+        min-height:30px; padding:5px 11px; background:#fff; color:var(--ei-accent);
+        border:1px solid #bcd4f7; border-radius:6px; box-shadow:none;
+        font-size:9.5px; font-weight:600;
+    }
+    .stButton button:hover, .stDownloadButton button:hover {
+        background:var(--ei-soft-blue); color:var(--ei-accent); border-color:#86b5f5; transform:none;
+    }
+    [data-baseweb="tab-list"] { gap:18px; border-bottom:1px solid var(--ei-border); }
+    [data-baseweb="tab"] {
+        min-height:34px; padding:6px 2px; background:transparent !important;
+        color:#53627a !important; font-size:10px !important;
+    }
+    [aria-selected="true"][data-baseweb="tab"] { color:var(--ei-accent) !important; }
+    [data-baseweb="tab-highlight"] { background-color:var(--ei-accent) !important; height:2px !important; }
+    [data-testid="stExpander"] {
+        background:#fff; border:1px solid var(--ei-border); border-radius:6px;
+    }
+    [data-testid="stExpander"] summary { color:var(--ei-text); font-size:10px; }
+    [data-testid="stAlert"] { border-radius:6px !important; box-shadow:none !important; font-size:10px !important; }
+    [data-testid="stAlert"] p { font-size:10px !important; }
+    [data-testid="stMetric"] { padding:4px 0; }
+    [data-testid="stMetricLabel"] p { color:var(--ei-muted) !important; font-size:8.5px !important; }
+    [data-testid="stMetricValue"] { color:var(--ei-text) !important; font-size:16px !important; }
+    div[role="radiogroup"] label { color:#46566f !important; font-size:10px !important; }
+    div[role="radiogroup"] label:has(input:checked) p { color:var(--ei-accent) !important; }
+    [data-testid="stSlider"] [role="slider"] { background:var(--ei-accent) !important; }
+
+    /* Supporting components */
+    .research-note { border-left:3px solid var(--ei-accent) !important; padding:11px 13px; }
+    .research-note .eyebrow { color:var(--ei-accent); font-size:8px; }
+    .research-note .title { color:var(--ei-text); font-size:12px; }
+    .research-note .body { color:#46566f; font-size:10.5px; line-height:1.55; }
+    .research-note .source { color:var(--ei-muted); font-size:8px; }
+    .thesis-box { color:#34445f; border-left:3px solid var(--ei-accent) !important; font-size:10.5px; }
+    .company-description { color:#34445f; font-size:10.5px; padding:11px 13px; }
+    .formula-card { padding:11px 13px; }
+    .formula-card .name { color:var(--ei-accent); font-size:8px; }
+    .formula-card .formula { color:var(--ei-text); font-size:12px; }
+    .formula-card .explain { color:var(--ei-muted); font-size:9.5px; }
+    .terminal { background:#f8fafc !important; color:#334155 !important; font-size:10px; box-shadow:none !important; }
+    .terminal .p { color:var(--ei-accent); }
+    .terminal .i { color:var(--ei-positive); }
+    .terminal .c { color:#334155; }
+    .nav-hint { display:none; }
+
+    /* Desktop/tablet/mobile behavior */
+    @media (min-width:1024px) {
+        section[data-testid="stSidebar"] {
+            display:block !important; transform:none !important; visibility:visible !important;
+            min-width:212px !important; width:212px !important;
+        }
+        [data-testid="stSidebarCollapsedControl"], [data-testid="stExpandSidebarButton"] { display:none !important; }
+        .st-key-mobile_section_nav { display:none !important; }
+        [data-testid="stLayoutWrapper"]:has(.st-key-mobile_section_nav) { display:none !important; }
+    }
+    @media (min-width:1024px) and (max-width:1199px) {
+        .st-key-application_header [data-testid="stHorizontalBlock"] { flex-wrap:nowrap !important; }
+        .st-key-application_header [data-testid="stColumn"] { min-width:0 !important; flex:auto !important; }
+    }
+    @media (max-width:1023px) {
+        section[data-testid="stSidebar"] { background:#fff !important; }
+        .st-key-mobile_section_nav {
+            display:block; position:sticky; top:5px; z-index:1000; width:calc(100% - 94px);
+            margin:5px 0 6px 94px; padding:4px 5px; background:#fff;
+            border:1px solid var(--ei-border); border-radius:6px; box-shadow:var(--ei-shadow);
+        }
+        [data-testid="stSidebarCollapsedControl"] button,
+        [data-testid="stExpandSidebarButton"] {
+            min-width:78px !important; width:78px !important; height:34px !important;
+            top:7px !important; left:8px !important; padding:0 9px !important;
+            background:#fff !important; color:var(--ei-accent) !important;
+            border:1px solid #bcd4f7 !important; border-radius:6px !important; box-shadow:var(--ei-shadow) !important;
+        }
+        [data-testid="stSidebarCollapsedControl"] button::after,
+        [data-testid="stExpandSidebarButton"]::after { color:var(--ei-accent) !important; }
+        .st-key-application_header { position:relative; margin-top:3px !important; }
+        .header-market-time, .header-actions { display:none; }
+        .st-key-application_header [data-testid="stColumn"]:nth-child(n+3) { display:none !important; }
+        .security-header { grid-template-columns:1fr; gap:7px; }
+        .security-quote { text-align:left; padding-left:70px; }
+    }
+    @media (max-width:600px) {
+        .block-container { padding:0 10px 34px !important; }
+        .st-key-application_header { margin:0 -10px 10px !important; padding:5px 10px !important; }
+        .st-key-application_header [data-testid="stHorizontalBlock"] { display:grid !important; grid-template-columns:82px minmax(0,1fr); }
+        .st-key-application_header [data-testid="stColumn"] { width:auto !important; min-width:0 !important; flex:auto !important; }
+        .page-head { flex-direction:column; align-items:flex-start; gap:2px; padding-left:0; }
+        .page-head .title { font-size:17px !important; }
+        .security-header { padding:10px; }
+        .security-symbol { min-width:48px; width:48px; height:48px; }
+        .security-name { font-size:17px; }
+        .security-quote { padding-left:62px; }
+        .security-price { font-size:21px; }
+        .stat-grid, .dcf-result-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+        .formula-grid { grid-template-columns:1fr; }
+        [data-baseweb="tab-list"] { gap:12px; overflow-x:auto; }
+        [data-baseweb="tab"] { white-space:nowrap; }
+        .sidebar-author { position:relative; left:auto; bottom:auto; width:auto; margin-top:16px; }
+    }
     </style>
     """,
     unsafe_allow_html=True,
@@ -1081,9 +1446,8 @@ def fmt_pct(v):
 st.sidebar.markdown(
     """
     <div class="sb-brand">
-        <div class="mark">ER</div>
-        <div><div class="t">Research Dashboard</div>
-        <div class="s">Equity research</div></div>
+        <div class="mark">↗</div>
+        <div><div class="t">Equity Research <span class="accent">Dashboard</span></div></div>
     </div>
     """,
     unsafe_allow_html=True,
@@ -1167,8 +1531,13 @@ for group_name, group_pages in NAV_GROUPS.items():
         args=(group_name,),
     )
 
-st.sidebar.divider()
-st.sidebar.caption("Market and fundamentals data via Yahoo Finance. Research use only; not investment advice.")
+st.sidebar.markdown(
+    """<div class="sidebar-author"><div class="row"><div class="icon">↗</div>
+    <div><div class="name">Built by Garrett Ewy</div>
+    <div class="role">Quantitative Equity Research</div></div></div>
+    <div class="version">v2.0.0</div></div>""",
+    unsafe_allow_html=True,
+)
  
 # Heavy universe data is loaded later, only on pages that use it.
 comparison_df = pd.DataFrame()
@@ -1225,7 +1594,7 @@ def security_header(info):
         f"""<div class="security-header">
         <div class="security-id">
             <div class="security-symbol">{escape(ticker)}</div>
-            <div><div class="security-name">{name}</div>
+            <div><div class="security-name">{name}<span class="ticker-badge">{escape(ticker)}</span></div>
             <div class="security-meta">{sector} · {industry} · {exchange}</div></div>
         </div>
         <div class="security-quote">
@@ -1357,26 +1726,26 @@ def price_chart(height=430, key="period_main", selected_interval="1d", chart_typ
     fig.add_trace(go.Scatter(x=data["Date"], y=data["MA200"], mode="lines",
                              name="MA200", line=dict(color=BLUE_LT, width=1.7)))
     fig.update_layout(
-        template="plotly_dark", height=height, xaxis_rangeslider_visible=False,
+        template="plotly_white", height=height, xaxis_rangeslider_visible=False,
         paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
         font=dict(color=TEXT, family="Inter"), margin=dict(l=10, r=10, t=10, b=10),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0,
                     bgcolor="rgba(0,0,0,0)"),
     )
-    fig.update_xaxes(gridcolor="rgba(255,255,255,0.05)", zeroline=False)
-    fig.update_yaxes(gridcolor="rgba(255,255,255,0.05)", zeroline=False)
+    fig.update_xaxes(gridcolor="rgba(15,31,61,0.08)", zeroline=False)
+    fig.update_yaxes(gridcolor="rgba(15,31,61,0.08)", zeroline=False)
     st.plotly_chart(fig, width="stretch", config={"displayModeBar": False})
     if show_volume and "Volume" in data:
         volume = go.Figure(go.Bar(
             x=data["Date"], y=data["Volume"], name="Volume", marker_color="#315b86",
         ))
         volume.update_layout(
-            template="plotly_dark", height=180, paper_bgcolor="rgba(0,0,0,0)",
+            template="plotly_white", height=180, paper_bgcolor="rgba(0,0,0,0)",
             plot_bgcolor="rgba(0,0,0,0)", font=dict(color=TEXT, family="Inter"),
             margin=dict(l=10, r=10, t=10, b=10), showlegend=False, yaxis_title="Volume",
         )
-        volume.update_xaxes(gridcolor="rgba(255,255,255,0.05)")
-        volume.update_yaxes(gridcolor="rgba(255,255,255,0.05)")
+        volume.update_xaxes(gridcolor="rgba(15,31,61,0.08)")
+        volume.update_yaxes(gridcolor="rgba(15,31,61,0.08)")
         st.plotly_chart(volume, width="stretch", config={"displayModeBar": False})
     return data
  
@@ -1477,13 +1846,13 @@ def financials_chart():
     fig.add_trace(go.Bar(x=yrs, y=fin["net_income"], name="Net Income", marker_color=GREEN))
     fig.add_trace(go.Bar(x=yrs, y=fin["ocf"], name="Operating Cash Flow", marker_color=PURPLE))
     fig.update_layout(
-        template="plotly_dark", barmode="group", height=360,
+        template="plotly_white", barmode="group", height=360,
         paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
         font=dict(color=TEXT, family="Inter"), margin=dict(l=10, r=10, t=10, b=10),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0, bgcolor="rgba(0,0,0,0)"),
     )
-    fig.update_xaxes(gridcolor="rgba(255,255,255,0.05)")
-    fig.update_yaxes(gridcolor="rgba(255,255,255,0.05)")
+    fig.update_xaxes(gridcolor="rgba(15,31,61,0.08)")
+    fig.update_yaxes(gridcolor="rgba(15,31,61,0.08)")
     st.markdown("<div style='font-size:17px;font-weight:800;color:#f8fafc;margin-bottom:6px;'>Financials Overview</div>",
                 unsafe_allow_html=True)
     with st.container(border=True):
@@ -1860,9 +2229,9 @@ def render_risk_performance(info):
             fig = go.Figure()
             fig.add_trace(go.Scatter(x=frame.index, y=frame[ticker], mode="lines", name=selected_company, line=dict(color=BLUE_LT, width=2.2)))
             fig.add_trace(go.Scatter(x=frame.index, y=frame["S&P 500"], mode="lines", name="S&P 500", line=dict(color=ORANGE, width=1.8)))
-            fig.update_layout(template="plotly_dark", height=330, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font=dict(color=TEXT, family="Inter"), margin=dict(l=10, r=10, t=20, b=10), yaxis_title=y_title)
-            fig.update_xaxes(gridcolor="rgba(255,255,255,0.05)")
-            fig.update_yaxes(gridcolor="rgba(255,255,255,0.05)")
+            fig.update_layout(template="plotly_white", height=330, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font=dict(color=TEXT, family="Inter"), margin=dict(l=10, r=10, t=20, b=10), yaxis_title=y_title)
+            fig.update_xaxes(gridcolor="rgba(15,31,61,0.08)")
+            fig.update_yaxes(gridcolor="rgba(15,31,61,0.08)")
             st.plotly_chart(fig, width="stretch", config={"displayModeBar": False})
     with st.expander("Metric definitions"):
         st.markdown(
@@ -1927,9 +2296,9 @@ def render_peer_comparison():
         fig = go.Figure()
         for column in history.columns:
             fig.add_trace(go.Scatter(x=history.index, y=history[column], mode="lines", name=column))
-        fig.update_layout(template="plotly_dark", height=360, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font=dict(color=TEXT, family="Inter"), margin=dict(l=10, r=10, t=20, b=10), yaxis_title="Growth of $100", legend=dict(orientation="h"))
-        fig.update_xaxes(gridcolor="rgba(255,255,255,0.05)")
-        fig.update_yaxes(gridcolor="rgba(255,255,255,0.05)")
+        fig.update_layout(template="plotly_white", height=360, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font=dict(color=TEXT, family="Inter"), margin=dict(l=10, r=10, t=20, b=10), yaxis_title="Growth of $100", legend=dict(orientation="h"))
+        fig.update_xaxes(gridcolor="rgba(15,31,61,0.08)")
+        fig.update_yaxes(gridcolor="rgba(15,31,61,0.08)")
         st.plotly_chart(fig, width="stretch", config={"displayModeBar": False})
     else:
         st.info("Price performance data unavailable for this peer group.")
@@ -1938,7 +2307,7 @@ def render_peer_comparison():
         bar = go.Figure()
         for column in chart_metrics.columns:
             bar.add_trace(go.Bar(x=chart_metrics.index, y=chart_metrics[column], name=column))
-        bar.update_layout(template="plotly_dark", barmode="group", height=320, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font=dict(color=TEXT, family="Inter"), margin=dict(l=10, r=10, t=20, b=10), yaxis_title="%")
+        bar.update_layout(template="plotly_white", barmode="group", height=320, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font=dict(color=TEXT, family="Inter"), margin=dict(l=10, r=10, t=20, b=10), yaxis_title="%")
         st.plotly_chart(bar, width="stretch", config={"displayModeBar": False})
     display = metrics.copy()
     display["Market Cap"] = display["Market Cap"].map(fmt_big)
@@ -2171,12 +2540,12 @@ def render_bank_equity_dcf(info, statement_data):
         chart.add_trace(go.Bar(x=forecast_df["Year"], y=forecast_df["Net Income"] / 1e9, name="Net income", marker_color=BLUE))
         chart.add_trace(go.Scatter(x=forecast_df["Year"], y=forecast_df["FCFE"] / 1e9, name="FCFE", mode="lines+markers", line=dict(color=PURPLE, width=3)))
         chart.update_layout(
-            template="plotly_dark", height=310, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+            template="plotly_white", height=310, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
             font=dict(color=TEXT, family="Inter"), margin=dict(l=10, r=10, t=28, b=10),
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0), yaxis_title="$ billions",
         )
-        chart.update_xaxes(gridcolor="rgba(255,255,255,0.05)")
-        chart.update_yaxes(gridcolor="rgba(255,255,255,0.05)")
+        chart.update_xaxes(gridcolor="rgba(15,31,61,0.08)")
+        chart.update_yaxes(gridcolor="rgba(15,31,61,0.08)")
         st.plotly_chart(chart, width="stretch", config={"displayModeBar": False})
         display_df = forecast_df.copy()
         for column in ["Growth", "ROE", "Payout"]:
@@ -2204,7 +2573,7 @@ def render_bank_equity_dcf(info, statement_data):
             texttemplate="%{text}", showscale=False,
         ))
         heatmap.update_layout(
-            template="plotly_dark", height=330, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+            template="plotly_white", height=330, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
             font=dict(color=TEXT, family="Inter"), margin=dict(l=10, r=10, t=25, b=10),
         )
         st.plotly_chart(heatmap, width="stretch", config={"displayModeBar": False})
@@ -2452,14 +2821,14 @@ def render_dcf_model(info):
             name="FCFF", mode="lines+markers", line=dict(color=PURPLE, width=3),
         ))
         chart.update_layout(
-            template="plotly_dark", height=310,
+            template="plotly_white", height=310,
             paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
             font=dict(color=TEXT, family="Inter"), margin=dict(l=10, r=10, t=28, b=10),
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
             yaxis_title="$ billions",
         )
-        chart.update_xaxes(gridcolor="rgba(255,255,255,0.05)")
-        chart.update_yaxes(gridcolor="rgba(255,255,255,0.05)")
+        chart.update_xaxes(gridcolor="rgba(15,31,61,0.08)")
+        chart.update_yaxes(gridcolor="rgba(15,31,61,0.08)")
         st.plotly_chart(chart, width="stretch", config={"displayModeBar": False})
 
         display_forecast = forecast_df.copy()
@@ -2504,7 +2873,7 @@ def render_dcf_model(info):
                 showscale=False,
             ))
             sensitivity.update_layout(
-                template="plotly_dark", height=320,
+                template="plotly_white", height=320,
                 paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
                 font=dict(color=TEXT, family="Inter"), margin=dict(l=10, r=10, t=25, b=10),
             )
@@ -2842,26 +3211,37 @@ page = st.session_state["active_page"]
 # APPLICATION HEADER + GLOBAL SECURITY SELECTOR
 # =============================================================
 with st.container(key="application_header"):
-    header_identity, header_selector = st.columns([3.0, 1.35])
-    with header_identity:
-        st.markdown(
-            """<div class="product-head"><div class="identity">
-            <div class="product-mark">ER</div>
-            <div><div class="product-name">Equity Research Dashboard</div>
-            <div class="product-sub">Market Data · Fundamental Analysis · Valuation · Quantitative Research</div>
-            <div class="product-byline">Built by Garrett Ewy</div></div></div></div>""",
-            unsafe_allow_html=True,
-        )
+    header_ticker, header_selector, header_spacer, header_market, header_icons = st.columns([0.72, 1.25, 2.8, 2.0, 1.15])
     with header_selector:
-        st.markdown("<div class='header-selector-label'>Security</div>", unsafe_allow_html=True)
         selected_company = st.selectbox(
             "Company / Ticker",
             list(COMPANIES.keys()),
-            format_func=lambda company: f"{company} ({COMPANIES[company]})",
+            format_func=lambda company: f"{company} Inc." if company == "Apple" else company,
             key="main_company_select",
             label_visibility="collapsed",
         )
 ticker = COMPANIES[selected_company]
+with header_ticker:
+    st.markdown(
+        f"<div class='header-ticker-chip'><span class='glyph'>{'●' if ticker == 'AAPL' else '◆'}</span>{escape(ticker)}<span style='color:#8390a2'>⌄</span></div>",
+        unsafe_allow_html=True,
+    )
+with header_market:
+    market_stamp = datetime.now(ZoneInfo("America/Chicago")).strftime("%b %d, %Y %I:%M %p CT")
+    st.markdown(
+        f"<div class='header-market-time'>Market data as of {market_stamp}<span class='live-dot'>●</span></div>",
+        unsafe_allow_html=True,
+    )
+with header_icons:
+    st.markdown(
+        """<div class='header-actions' aria-label='Dashboard utilities'>
+        <span class='header-action' title='Search'>⌕</span>
+        <span class='header-action' title='Help'>?</span>
+        <span class='header-action' title='Notifications'>♧</span>
+        <span class='header-avatar' title='Garrett Ewy'>GE</span>
+        <span class='header-chevron'>⌄</span></div>""",
+        unsafe_allow_html=True,
+    )
 
 if selected_company in SLEEPER_STOCKS:
     st.warning("Higher-risk coverage company. Review the underlying thesis and model assumptions carefully.")
