@@ -498,13 +498,20 @@ st.markdown(
         color:#f5f8fc; background:rgba(91,141,239,.14); border-color:rgba(91,141,239,.22);
         border-left:2px solid var(--ei-accent); box-shadow:none;
     }
+    [data-testid="stSidebar"] input[type="radio"] {
+        position:absolute !important; opacity:0 !important; pointer-events:none !important;
+    }
+    [data-testid="stSidebar"] label[data-testid="stRadioOption"] > div > div > div:first-child {
+        display:none !important;
+    }
 
     @media (min-width: 1024px) {
         section[data-testid="stSidebar"] {
             display:block !important; transform:none !important; visibility:visible !important;
             min-width:17rem !important; width:17rem !important;
         }
-        [data-testid="stSidebarCollapsedControl"] { display:none !important; }
+        [data-testid="stSidebarCollapsedControl"],
+        [data-testid="stExpandSidebarButton"] { display:none !important; }
         .st-key-mobile_section_nav { display:none !important; }
     }
 
