@@ -2,7 +2,7 @@
 
 Generated 2026-09-03 19:23 UTC from the same Yahoo Finance statement fields and valuation functions used by the dashboard.
 
-V1 remains the public baseline. V2 is a separately labeled comparison model. A market-price difference is an output, not a calibration target.
+V2 is the public default. V1 remains a frozen legacy baseline. A market-price difference is an output, not a calibration target.
 
 | Ticker | Primary Valuation Framework | Forecast Horizon | WACC | Year 1 Growth | Mature Growth | Starting FCFF Margin | Mature FCFF Margin | V1 Base DCF | V2 Base DCF | Market Price | V2 Difference % | Status |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |

@@ -1,7 +1,7 @@
 # DCF V2 design proposal
 
-Status: **Implemented as a validated comparison; V1 remains the public baseline**
-Baseline: the current DCF V1 remains unchanged and public.
+Status: **Implemented, validated and promoted to public default**
+Baseline: DCF V1 remains unchanged and available as a legacy comparison.
 
 Validation output: `DCF_V2_VALIDATION.md` and `DCF_V2_VALIDATION.csv`.
 
@@ -210,8 +210,8 @@ No single solved input should be described as “what the market believes.”
 
 ## C2 validation plan after approval
 
-V1 will be frozen as a baseline. V2 will be implemented behind an explicit comparison
-view and tested before becoming public default. The 19-security report will include
+V1 was frozen as a baseline. V2 was implemented behind an explicit comparison
+view, tested, and then promoted to public default. The 19-security report includes
 company, framework, modifiers, horizon, WACC, Year 1 growth, mature growth, starting and
 mature FCFF margins, Base value, market price and difference percentage for both V1 and
 V2. Success will be judged by financial appropriateness, consistency, transparency and

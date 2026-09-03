@@ -1500,8 +1500,8 @@ def percent_value(value, signed=False):
     return f"{value * 100:+.1f}%" if signed else f"{value * 100:.1f}%"
 
 
-def default_dcf_snapshot(info):
-    """Calculate unedited scenario values for overview and valuation summaries."""
+def default_dcf_v1_snapshot(info):
+    """Calculate the frozen V1 scenario values for legacy comparisons."""
     statement_data = get_dcf_financials(ticker)
     history = statement_data.get("history", [])
     current_price = g(info, "currentPrice") or g(info, "regularMarketPrice")
@@ -1557,6 +1557,30 @@ def default_dcf_snapshot(info):
                 )["value_per_share"]
             except ValueError:
                 return None
+    values["Current"] = float(current_price)
+    return values
+
+
+def default_dcf_v2_snapshot(info):
+    """Calculate unedited V2 scenarios for public dashboard summaries."""
+    statement_data = get_dcf_financials(ticker)
+    history = statement_data.get("history", [])
+    current_price = g(info, "currentPrice") or g(info, "regularMarketPrice")
+    shares = valuation_share_count(info)
+    if not current_price or not shares:
+        return None
+    cash = g(info, "totalCash")
+    debt = g(info, "totalDebt")
+    cash = float(cash if cash is not None else statement_data.get("cash") or 0.0)
+    debt = float(debt if debt is not None else statement_data.get("debt") or 0.0)
+    model_info = {**info, "_risk_free_rate": get_risk_free_rate(), "_equity_risk_premium": 0.045}
+    try:
+        defaults = build_v2_defaults(ticker, history, model_info, float(shares), debt - cash)
+        if not defaults.get("suitable"):
+            return None
+        values = {name: run_v2_case(defaults, name)[0]["value_per_share"] for name in ("Bear", "Base", "Bull")}
+    except (TypeError, ValueError):
+        return None
     values["Current"] = float(current_price)
     return values
 
@@ -1732,7 +1756,7 @@ def render_company_analysis(info):
     st.markdown("#### Sourced company information")
     render_company_description(description, "analysis")
     research_note_block()
-    dcf_values = default_dcf_snapshot(info)
+    dcf_values = default_dcf_v2_snapshot(info)
     strengths, risks, drivers, valuation = derived_analysis(info, dcf_values)
     left, right = st.columns(2)
     with left:
@@ -2558,7 +2582,7 @@ def render_dcf_v2(info):
         ("Primary valuation framework", defaults["framework"]),
         ("Modifiers", " · ".join(defaults["modifiers"])),
         ("Forecast horizon", horizon_text),
-        ("Model status", "Validation comparison — V1 remains default"),
+        ("Model status", "Public default · company-aware framework"),
     ])
     if not defaults.get("suitable"):
         for warning in defaults.get("warnings", []):
@@ -2642,13 +2666,13 @@ def render_dcf_v2(info):
         relation = "below" if base_gap >= 0 else "above"
         st.caption(f"Current market price is {abs(base_gap):.1f}% {relation} the DCF V2 Base estimate.")
 
-    v1 = default_dcf_snapshot(info)
+    v1 = default_dcf_v1_snapshot(info)
     comparison = pd.DataFrame([{
-        "Model": "DCF V1 · public baseline",
+        "Model": "DCF V1 · legacy baseline",
         "Base Value": format_price(v1.get("Base") if v1 else None),
         "Market Difference": f"{(v1['Base'] / v1['Current'] - 1):+.1%}" if v1 and v1.get("Base") else "Data unavailable",
     }, {
-        "Model": "DCF V2 · validated comparison",
+        "Model": "DCF V2 · public default",
         "Base Value": format_price(base_value),
         "Market Difference": f"{base_gap / 100:+.1%}" if base_gap is not None else "Data unavailable",
     }])
@@ -2858,7 +2882,7 @@ if page == "Overview":
     with st.container(border=True):
         price_chart(height=390, key="period_overview", selected_interval="1d", chart_type="Price")
 
-    dcf_values = default_dcf_snapshot(security_info)
+    dcf_values = default_dcf_v2_snapshot(security_info)
     dcf_base = dcf_values.get("Base") if dcf_values else None
     dcf_gap = (dcf_base / dcf_values["Current"] - 1) if dcf_base is not None and dcf_values.get("Current") else None
     valuation_col, financial_col = st.columns(2)
@@ -2867,7 +2891,7 @@ if page == "Overview":
             ("P/E TTM", fmt_x(g(security_info, "trailingPE"), "x")),
             ("Forward P/E", fmt_x(g(security_info, "forwardPE"), "x")),
             ("EV / EBITDA", fmt_x(g(security_info, "enterpriseToEbitda"), "x")),
-            ("Base DCF Value", format_price(dcf_base)),
+            ("Base DCF V2 Value", format_price(dcf_base)),
             ("DCF Upside / Downside", percent_value(dcf_gap, signed=True)),
         ])
     with financial_col:
@@ -2925,11 +2949,11 @@ elif page == "Research Notes":
 
 elif page == "DCF Model":
     page_head(f"DCF Model — {selected_company}", "Editable scenario valuation with forecast, sensitivity and reverse DCF")
-    v1_tab, v2_tab = st.tabs(["DCF V1 · Public Baseline", "DCF V2 · Validated Comparison"])
-    with v1_tab:
-        render_dcf_model(security_info)
+    v2_tab, v1_tab = st.tabs(["DCF V2 · Public Default", "DCF V1 · Legacy Baseline"])
     with v2_tab:
         render_dcf_v2(security_info)
+    with v1_tab:
+        render_dcf_model(security_info)
 
 elif page == "Relative Valuation":
     page_head(f"Relative Valuation — {selected_company}", "Trading multiples and relevant peer context")
@@ -2975,7 +2999,7 @@ TTM fields such as revenue, free cash flow and net income use provider-reported 
     with dcf_tab:
         st.markdown(
             """#### DCF methodology
-- **Versioning:** DCF V1 remains the public baseline. DCF V2 is a separately labeled research comparison and does not replace or silently change V1 output.
+- **Versioning:** DCF V2 is the public default. The frozen DCF V1 remains available as a separately labeled legacy baseline for comparison.
 - **V1 revenue forecast:** the first-year growth assumption fades linearly toward the final forecast-year rate.
 - **V2 company-aware forecast:** each covered security is assigned a disclosed primary framework, business-model modifiers and a 5–15 year explicit horizon. Growth follows Year 1, intermediate and mature anchors. Mature margins use issuer-specific guardrails rather than one universal cap.
 - **FCFF-margin approach:** unlevered free cash flow is estimated from reported free cash flow plus after-tax interest, then forecast as a margin of revenue. This simplified model does not separately forecast EBIT, taxes, D&A, capital expenditure and working capital.

@@ -236,7 +236,7 @@ def write_reports(frame: pd.DataFrame) -> None:
         "",
         f"Generated {generated} from the same Yahoo Finance statement fields and valuation functions used by the dashboard.",
         "",
-        "V1 remains the public baseline. V2 is a separately labeled comparison model. A market-price difference is an output, not a calibration target.",
+        "V2 is the public default. V1 remains a frozen legacy baseline. A market-price difference is an output, not a calibration target.",
         "",
         header,
         divider,

@@ -1,8 +1,8 @@
 """Company-aware DCF V2 calculations.
 
-V1 remains in dcf_model.py as the frozen public baseline.  This module adds a
-separate comparison framework with issuer-specific horizons and economic
-guardrails; it never calibrates assumptions to the current share price.
+V1 remains in dcf_model.py as a frozen legacy baseline. This module powers the
+public default with issuer-specific horizons and economic guardrails; it never
+calibrates assumptions to the current share price.
 """
 
 from __future__ import annotations
