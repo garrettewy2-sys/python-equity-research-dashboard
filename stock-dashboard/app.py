@@ -663,7 +663,10 @@ st.markdown(
     html, body, .stApp, [data-testid="stAppViewContainer"], [data-testid="stMain"] {
         background:var(--ei-bg) !important; color:var(--ei-text) !important;
     }
-    [data-testid="stHeader"] { background:transparent !important; height:0 !important; }
+    [data-testid="stHeader"] {
+        background:transparent !important; height:0 !important;
+        pointer-events:none !important;
+    }
     [data-testid="stToolbar"], [data-testid="stDecoration"] { display:none !important; }
     .block-container {
         width:100%; max-width:1700px; padding:0 12px 38px 22px !important;
@@ -843,7 +846,7 @@ st.markdown(
     .sum-card .sub { font-size:11px; }
     .stat-grid { gap:10px; }
     .stat {
-        min-height:67px; padding:12px 13px; background:#fff;
+        min-height:67px; padding:12px 13px; background:#fbfcfe;
         border:1px solid #e6ebf1; border-radius:6px;
     }
     .stat .k { color:#526682; font-size:10px; font-weight:500; line-height:1.2; letter-spacing:0; text-transform:none; }
@@ -1110,6 +1113,7 @@ st.markdown(
         }
         [data-testid="stSidebarCollapsedControl"] button,
         [data-testid="stExpandSidebarButton"] {
+            pointer-events:auto !important;
             min-width:78px !important; width:78px !important; height:34px !important;
             top:7px !important; left:8px !important; padding:0 9px !important;
             background:#fff !important; color:var(--ei-accent) !important;
@@ -1197,7 +1201,9 @@ COMPANY_LOGOS = {
     "JPM": "https://www.google.com/s2/favicons?domain_url=https://www.jpmorganchase.com&sz=128",
     "GS": "https://cdn.jsdelivr.net/npm/simple-icons@v16/icons/goldmansachs.svg",
     "V": "https://cdn.jsdelivr.net/npm/simple-icons@v16/icons/visa.svg",
-    "BRK-B": "https://www.google.com/s2/favicons?domain_url=https://www.berkshirehathaway.com&sz=128",
+    # Berkshire's public favicon is a low-resolution generic globe, so use the
+    # deliberate ticker fallback instead of presenting it as a company mark.
+    "BRK-B": None,
     "LMT": "https://www.google.com/s2/favicons?domain_url=https://www.lockheedmartin.com&sz=128",
     "RKLB": "https://www.google.com/s2/favicons?domain_url=https://www.rocketlabusa.com&sz=128",
     "SOFI": "https://www.google.com/s2/favicons?domain_url=https://www.sofi.com&sz=128",
@@ -1630,7 +1636,7 @@ def fmt_pct(v):
 def company_logo_html(company, symbol, variant="security"):
     """Return a consistent company mark with a clean ticker fallback."""
     logo_url = COMPANY_LOGOS.get(symbol)
-    fallback = escape(symbol.replace("-", "")[:4])
+    fallback = escape(symbol[:5])
     image = ""
     if logo_url:
         image = (
@@ -3549,6 +3555,20 @@ with st.container(key="application_header"):
                 f"{{background-image:url('{selector_logo_css}') !important;}}</style>",
                 unsafe_allow_html=True,
             )
+        else:
+            selector_fallback = escape(current_header_ticker)
+            st.markdown(
+                "<style>"
+                ".st-key-application_header [data-testid='stSelectbox'] [role='group']"
+                "{background-image:none !important;position:relative;}"
+                ".st-key-application_header [data-testid='stSelectbox'] [role='group']::before"
+                f"{{content:'{selector_fallback}';position:absolute;left:9px;top:7px;width:24px;height:24px;"
+                "display:grid;place-items:center;box-sizing:border-box;border:1px solid #dbe3ed;"
+                "border-radius:5px;background:#f8fafc;color:#40536f;font-size:7px;font-weight:750;"
+                "line-height:1;pointer-events:none;z-index:1;}}"
+                "</style>",
+                unsafe_allow_html=True,
+            )
         selected_company = st.selectbox(
             "Company / Ticker",
             list(COMPANIES.keys()),
@@ -3586,7 +3606,7 @@ if page == "Overview":
     render_overview_metrics(security_info, overview_history)
     st.markdown("#### Price performance")
     with st.container(border=True):
-        price_chart(height=390, key="period_overview", selected_interval="1d", chart_type="Price")
+        price_chart(height=350, key="period_overview", selected_interval="1d", chart_type="Price")
 
     dcf_values = default_dcf_v2_snapshot(security_info)
     dcf_base = dcf_values.get("Base") if dcf_values else None
