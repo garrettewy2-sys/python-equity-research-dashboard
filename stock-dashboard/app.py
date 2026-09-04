@@ -772,15 +772,37 @@ st.markdown(
     }
     [data-testid="stSidebar"] div[role="radiogroup"] label::after { display:none !important; }
     .sidebar-author {
-        position:fixed; left:14px; bottom:40px; width:246px; padding:15px 16px;
+        position:fixed; left:14px; bottom:40px; width:246px; padding:17px 16px 15px;
         background:#fff; border:1px solid var(--ei-border); border-radius:7px;
         box-shadow:var(--ei-shadow); z-index:5;
     }
-    .sidebar-author .row { display:flex; align-items:flex-start; gap:9px; }
-    .sidebar-author .icon { color:var(--ei-accent); font-size:20px; line-height:1.2; }
-    .sidebar-author .name { color:#415572; font-size:12px; font-weight:500; }
-    .sidebar-author .role { color:#536987; font-size:12px; margin-top:8px; }
-    .sidebar-author .version { color:#718198; font-size:10px; margin-top:20px; }
+    .sidebar-author .creator-line { display:flex; align-items:baseline; gap:4px; }
+    .sidebar-author .built-by { color:#718198; font-size:10px; font-weight:500; }
+    .sidebar-author .creator-name { color:#253955; font-size:13px; font-weight:700; }
+    .sidebar-author .creator-role {
+        color:#536987; font-size:11px; line-height:1.45; margin-top:7px;
+    }
+    .sidebar-author .creator-links {
+        display:flex; align-items:center; gap:7px; margin-top:11px; padding-top:9px;
+        border-top:1px solid #edf1f5;
+    }
+    .sidebar-author .creator-link {
+        display:inline-flex; align-items:center; gap:4px; padding:4px 5px;
+        color:var(--ei-accent) !important; border-radius:4px;
+        font-size:10.5px; font-weight:650; line-height:1; text-decoration:none !important;
+        transition:background-color .16s ease,color .16s ease;
+    }
+    .sidebar-author .creator-link:hover {
+        color:#0b5bd3 !important; background:var(--ei-soft-blue);
+    }
+    .sidebar-author .social-icon {
+        display:block; width:13px; height:13px; flex:0 0 13px; background:currentColor;
+        -webkit-mask:var(--social-icon) center/contain no-repeat;
+        mask:var(--social-icon) center/contain no-repeat;
+    }
+    .sidebar-author .linkedin { --social-icon:url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/linkedin.svg'); }
+    .sidebar-author .github { --social-icon:url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/github.svg'); }
+    .sidebar-author .external-arrow { font-size:11px; line-height:1; }
 
     /* Pinned Lucide icon family for the navigation. */
     .st-key-nav_research label:nth-child(1) { --nav-icon:url('https://cdn.jsdelivr.net/npm/lucide-static@0.468.0/icons/circle-gauge.svg'); }
@@ -1741,10 +1763,18 @@ for group_name, group_pages in NAV_GROUPS.items():
     )
 
 st.sidebar.markdown(
-    """<div class="sidebar-author"><div class="row"><div class="icon"><span class="brand-chart-icon"></span></div>
-    <div><div class="name">Built by Garrett Ewy</div>
-    <div class="role">Market Data · Fundamental Analysis · Valuation · Risk</div></div></div>
-    <div class="version">v2.0.0</div></div>""",
+    """<div class="sidebar-author">
+    <div class="creator-line"><span class="built-by">Built by</span><span class="creator-name">Garrett Ewy</span></div>
+    <div class="creator-role">Equity Research · Valuation · Quantitative Analysis</div>
+    <div class="creator-links">
+      <a class="creator-link" href="https://www.linkedin.com/in/garrettewy/" target="_blank" rel="noopener noreferrer" aria-label="Garrett Ewy on LinkedIn">
+        <span class="social-icon linkedin" aria-hidden="true"></span><span>LinkedIn</span><span class="external-arrow" aria-hidden="true">↗</span>
+      </a>
+      <a class="creator-link" href="https://github.com/garrettewy2-sys/python-equity-research-dashboard" target="_blank" rel="noopener noreferrer" aria-label="Equity Research Terminal on GitHub">
+        <span class="social-icon github" aria-hidden="true"></span><span>GitHub</span><span class="external-arrow" aria-hidden="true">↗</span>
+      </a>
+    </div>
+    </div>""",
     unsafe_allow_html=True,
 )
  
