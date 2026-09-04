@@ -690,6 +690,7 @@ st.markdown(
     .st-key-application_header [data-testid="stHorizontalBlock"] {
         align-items:center !important; gap:8px !important; flex-wrap:nowrap !important;
     }
+    .st-key-application_header [data-testid="stSelectbox"] { height:30px !important; min-height:30px !important; }
     .st-key-application_header [data-testid="stColumn"] { min-width:0 !important; }
     .header-ticker-chip {
         height:30px; display:flex; align-items:center; justify-content:center; gap:7px;
@@ -777,7 +778,7 @@ st.markdown(
     .sidebar-author .version { color:#77869b; font-size:8px; margin-top:10px; }
 
     /* Page and company headers */
-    .page-head { margin:2px 0 7px !important; gap:6px 14px; }
+    .page-head { margin:0 0 7px !important; padding:12px 0 6px; gap:6px 14px; }
     .page-head .title { color:var(--ei-text) !important; font-size:18px !important; font-weight:700 !important; }
     .page-head .sub { color:var(--ei-muted) !important; font-size:10px !important; }
     .security-header {
@@ -791,6 +792,19 @@ st.markdown(
         min-width:56px; width:56px; height:56px; padding:0; border-radius:7px;
         background:#fff; border:1px solid var(--ei-border); color:#0f172a;
         font-size:12px; box-shadow:0 1px 2px rgba(15,31,61,.04);
+    }
+    .security-symbol.apple-mark { position:relative; }
+    .apple-body {
+        position:relative; display:block; width:24px; height:25px; background:#0f172a;
+        border-radius:46% 48% 50% 50% / 42% 42% 58% 58%; transform:rotate(-4deg);
+    }
+    .apple-body::before {
+        content:''; position:absolute; width:5px; height:9px; left:13px; top:-8px;
+        background:#0f172a; border-radius:80% 10% 80% 10%; transform:rotate(35deg);
+    }
+    .apple-body::after {
+        content:''; position:absolute; width:9px; height:9px; right:-5px; top:4px;
+        background:#fff; border-radius:50%;
     }
     .security-name { color:var(--ei-text); font-size:20px; font-weight:700; }
     .security-name .ticker-badge {
@@ -825,8 +839,8 @@ st.markdown(
         min-height:50px; padding:8px 10px; background:#fff;
         border:1px solid #e6ebf1; border-radius:6px;
     }
-    .stat .k { color:var(--ei-muted); font-size:8px; font-weight:500; letter-spacing:0; text-transform:none; }
-    .stat .v { color:var(--ei-text); font-size:14px; font-weight:700; margin-top:5px; }
+    .stat .k { color:var(--ei-muted); font-size:8px; font-weight:500; line-height:1.2; letter-spacing:0; text-transform:none; }
+    .stat .v { color:var(--ei-text); font-size:14px; font-weight:700; line-height:1.1; margin-top:5px; }
     .pos { color:var(--ei-positive) !important; }
     .neg { color:var(--ei-negative) !important; }
     .neutral { color:var(--ei-muted) !important; }
@@ -945,6 +959,89 @@ st.markdown(
     .terminal .c { color:#334155; }
     .nav-hint { display:none; }
 
+    /* Relative Valuation mockup composition */
+    .st-key-relative_top { gap:0 !important; }
+    .st-key-relative_top [data-testid="stHorizontalBlock"] {
+        align-items:stretch !important; gap:12px !important; flex-wrap:nowrap !important;
+    }
+    .st-key-relative_top [data-testid="stColumn"] { min-width:0 !important; }
+    .st-key-relative_top [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(1) {
+        flex:0 0 calc(36% - 4px) !important; width:calc(36% - 4px) !important;
+    }
+    .st-key-relative_top [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(2) {
+        flex:0 0 calc(64% - 8px) !important; width:calc(64% - 8px) !important;
+    }
+    .mock-card {
+        background:#fff; border:1px solid var(--ei-border); border-radius:7px;
+        box-shadow:var(--ei-shadow); padding:10px 11px;
+    }
+    .mock-card-title { color:var(--ei-text); font-size:11px; font-weight:700; margin-bottom:8px; }
+    .mock-multiples, .mock-peers { height:216px; min-height:216px; box-sizing:border-box; overflow:hidden; }
+    .mock-multiples .stat-grid { grid-template-columns:repeat(3,minmax(0,1fr)); gap:7px; }
+    .mock-multiples .stat { min-height:49px; }
+    .mock-table-wrap { width:100%; overflow:auto; border:1px solid #e7ebf0; border-radius:5px; }
+    .mock-table { width:100%; border-collapse:collapse; background:#fff; table-layout:auto; }
+    .mock-table th {
+        padding:5px 7px; color:#687892; background:#f8fafc; border-bottom:1px solid var(--ei-border);
+        border-right:1px solid #edf1f5; font-size:7.5px; font-weight:600; line-height:1.15; text-align:center; white-space:nowrap;
+    }
+    .mock-table td {
+        padding:5px 7px; color:var(--ei-text); border-bottom:1px solid #edf1f5;
+        border-right:1px solid #f1f4f7; font-size:8px; line-height:1.15; text-align:center; white-space:nowrap;
+    }
+    .mock-table th:first-child, .mock-table td:first-child { text-align:left; font-weight:600; }
+    .mock-table th:last-child, .mock-table td:last-child { border-right:0; }
+    .mock-table tr:last-child td { border-bottom:0; }
+    .mock-note { color:var(--ei-muted); font-size:7.5px; line-height:1.3; margin-top:8px; }
+    .mock-dcf-summary { height:105px; box-sizing:border-box; margin-top:17px; padding-bottom:10px; overflow:hidden; }
+    .mock-summary-grid { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:10px; }
+    .mock-summary-cell {
+        min-height:61px; display:flex; flex-direction:column; align-items:center; justify-content:center;
+        padding:7px 8px; border:1px solid #e7ebf0; border-radius:5px; text-align:center;
+    }
+    .mock-summary-cell .k { color:var(--ei-muted); font-size:7.5px; font-weight:500; }
+    .mock-summary-cell .v { color:var(--ei-accent); font-size:14px; font-weight:700; margin-top:6px; white-space:nowrap; }
+    .mock-summary-cell .v.bear-value { color:var(--ei-negative); }
+    .mock-summary-cell .v.bull-value { color:var(--ei-positive); }
+    .mock-summary-cell .s { color:var(--ei-muted); font-size:7.5px; margin-top:4px; }
+    .mock-summary-cell .range-value { font-size:12px; }
+    .st-key-relative_preview {
+        height:190px !important; min-height:190px !important; max-height:190px !important;
+        box-sizing:border-box; overflow:hidden; margin-top:14px !important; padding:8px 11px 5px; background:#fff;
+        border:1px solid var(--ei-border); border-radius:7px; box-shadow:var(--ei-shadow);
+        gap:6px !important;
+    }
+    .preview-title { margin-bottom:0; }
+    .st-key-relative_filters [data-testid="stHorizontalBlock"] {
+        gap:9px !important; align-items:end !important; flex-wrap:nowrap !important;
+    }
+    .st-key-relative_filters [data-testid="stColumn"] { min-width:0 !important; }
+    .st-key-relative_filters [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(1),
+    .st-key-relative_filters [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(2),
+    .st-key-relative_filters [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(3) {
+        flex:1 1 0 !important; width:auto !important;
+    }
+    .st-key-relative_filters [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(4) {
+        flex:2.35 1 0 !important; width:auto !important;
+    }
+    .st-key-relative_filters [data-testid="stSelectbox"],
+    .st-key-relative_filters [data-testid="stSlider"] { margin-bottom:0 !important; }
+    .st-key-relative_filters [data-testid="stSelectbox"] { height:50px !important; min-height:50px !important; overflow:visible; }
+    .st-key-relative_filters [data-testid="stWidgetLabel"] { height:15px !important; min-height:15px !important; }
+    .st-key-relative_filters [data-testid="stWidgetLabel"] p { line-height:1 !important; }
+    .preview-table { border-left:0; border-right:0; border-radius:0; }
+    .preview-table .mock-table th, .preview-table .mock-table td { padding-top:3px; padding-bottom:3px; }
+    .st-key-relative_preview .stButton button { white-space:nowrap; font-size:8px; height:25px !important; min-height:25px !important; padding:2px 7px; }
+    .st-key-relative_preview_button [data-testid="stHorizontalBlock"] { flex-wrap:nowrap !important; gap:8px !important; }
+    .st-key-relative_preview_button [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(1),
+    .st-key-relative_preview_button [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(3) {
+        flex:1 1 0 !important; width:auto !important; min-width:0 !important;
+    }
+    .st-key-relative_preview_button [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(2) {
+        flex:0 0 170px !important; width:170px !important; min-width:170px !important;
+    }
+    .st-key-relative_preview_button { position:relative; top:10px; }
+
     /* Desktop/tablet/mobile behavior */
     @media (min-width:1024px) {
         section[data-testid="stSidebar"] {
@@ -961,6 +1058,22 @@ st.markdown(
     }
     @media (max-width:1023px) {
         section[data-testid="stSidebar"] { background:#fff !important; }
+        [data-testid="stToolbar"] { display:flex !important; }
+        [data-testid="stSidebarHeader"] {
+            display:flex !important; position:absolute !important; top:5px; right:5px;
+            width:34px !important; height:34px !important; min-height:34px !important;
+            padding:0 !important; z-index:1004;
+        }
+        [data-testid="stLogoSpacer"] { display:none !important; }
+        [data-testid="stSidebarCollapseButton"],
+        [data-testid="stSidebarCollapseButton"] button {
+            width:34px !important; height:34px !important; min-width:34px !important;
+            color:var(--ei-accent) !important; background:#fff !important;
+            border:1px solid #bcd4f7 !important; border-radius:6px !important;
+        }
+        section[data-testid="stSidebar"][aria-expanded="false"] [data-testid="stSidebarHeader"] {
+            display:none !important;
+        }
         .st-key-mobile_section_nav {
             display:block; position:sticky; top:5px; z-index:1000; width:calc(100% - 94px);
             margin:5px 0 6px 94px; padding:4px 5px; background:#fff;
@@ -978,8 +1091,11 @@ st.markdown(
         .st-key-application_header { position:relative; margin-top:3px !important; }
         .header-market-time, .header-actions { display:none; }
         .st-key-application_header [data-testid="stColumn"]:nth-child(n+3) { display:none !important; }
-        .security-header { grid-template-columns:1fr; gap:7px; }
-        .security-quote { text-align:left; padding-left:70px; }
+        .security-header {
+            grid-template-columns:minmax(0,1.6fr) minmax(220px,.7fr); gap:16px;
+            height:78px; min-height:0;
+        }
+        .security-quote { text-align:right; padding-left:0; }
     }
     @media (max-width:600px) {
         .block-container { padding:0 10px 34px !important; }
@@ -989,15 +1105,28 @@ st.markdown(
         .page-head { flex-direction:column; align-items:flex-start; gap:2px; padding-left:0; }
         .page-head .title { font-size:17px !important; }
         .security-header { padding:10px; }
+        .security-header { grid-template-columns:1fr; gap:7px; height:auto; min-height:126px; }
         .security-symbol { min-width:48px; width:48px; height:48px; }
         .security-name { font-size:17px; }
-        .security-quote { padding-left:62px; }
+        .security-quote { text-align:left; padding-left:62px; }
         .security-price { font-size:21px; }
         .stat-grid, .dcf-result-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
         .formula-grid { grid-template-columns:1fr; }
         [data-baseweb="tab-list"] { gap:12px; overflow-x:auto; }
         [data-baseweb="tab"] { white-space:nowrap; }
         .sidebar-author { position:relative; left:auto; bottom:auto; width:auto; margin-top:16px; }
+        .st-key-relative_top [data-testid="stHorizontalBlock"],
+        .st-key-relative_filters [data-testid="stHorizontalBlock"] { flex-wrap:wrap !important; }
+        .st-key-relative_top [data-testid="stColumn"],
+        .st-key-relative_filters [data-testid="stColumn"] { min-width:100% !important; flex:1 1 100% !important; }
+        .mock-summary-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+        .mock-multiples, .mock-peers, .mock-dcf-summary {
+            height:auto; min-height:0; overflow:visible;
+        }
+        .st-key-relative_preview {
+            height:auto !important; min-height:0 !important; max-height:none !important; overflow:visible;
+        }
+        .st-key-relative_preview_button { top:0; padding-bottom:4px; }
     }
     </style>
     """,
@@ -1590,10 +1719,13 @@ def security_header(info):
         direction = "neutral"
         change_text = "Change unavailable"
 
+    symbol_class = " apple-mark" if ticker == "AAPL" else ""
+    symbol_content = "<span class='apple-body'></span>" if ticker == "AAPL" else escape(ticker)
+
     st.markdown(
         f"""<div class="security-header">
         <div class="security-id">
-            <div class="security-symbol">{escape(ticker)}</div>
+            <div class="security-symbol{symbol_class}">{symbol_content}</div>
             <div><div class="security-name">{name}<span class="ticker-badge">{escape(ticker)}</span></div>
             <div class="security-meta">{sector} · {industry} · {exchange}</div></div>
         </div>
@@ -2152,7 +2284,7 @@ def render_relative_valuation(info):
     fcf = g(info, "freeCashflow")
     market_cap = g(info, "marketCap")
     price_fcf = market_cap / fcf if market_cap is not None and fcf and fcf > 0 else None
-    stat_grid(f"Trading Multiples — {ticker}", [
+    multiple_pairs = [
         ("Trailing P/E", fmt_x(g(info, "trailingPE"), "x")),
         ("Forward P/E", fmt_x(g(info, "forwardPE"), "x")),
         ("PEG", fmt_x(g(info, "pegRatio"), "x")),
@@ -2160,18 +2292,137 @@ def render_relative_valuation(info):
         ("Price / Sales", fmt_x(g(info, "priceToSalesTrailing12Months"), "x")),
         ("Price / Book", fmt_x(g(info, "priceToBook"), "x")),
         ("Price / FCF", fmt_x(price_fcf, "x")),
-    ])
+    ]
     peer_names = [selected_company, *PEER_GROUPS.get(selected_company, [])]
     peers = get_company_metrics(peer_names)
-    st.markdown("#### Relevant peer snapshot")
     display = peers.copy()
     display["Market Cap"] = display["Market Cap"].map(fmt_big)
     for column in ["P/E TTM", "EV / EBITDA", "Price / FCF"]:
         display[column] = display[column].map(lambda value: fmt_x(value, "x") if pd.notna(value) else "Data unavailable")
     for column in ["Revenue Growth", "Operating Margin", "FCF Margin"]:
         display[column] = display[column].map(lambda value: f"{value:.1%}" if pd.notna(value) else "Data unavailable")
-    st.dataframe(display[["Company", "Ticker", "Market Cap", "P/E TTM", "EV / EBITDA", "Revenue Growth", "Operating Margin", "FCF Margin"]], hide_index=True, width="stretch")
-    st.caption("Peers are selected from the dashboard’s 19-company research universe. Values are provider-reported or directly calculated; unavailable metrics are not estimated.")
+
+    with st.container(key="relative_top"):
+        multiple_column, peer_column = st.columns([0.36, 0.64])
+        with multiple_column:
+            tiles = "".join(
+                f"<div class='stat'><div class='k'>{escape(label)}</div><div class='v'>{escape(value)}</div></div>"
+                for label, value in multiple_pairs
+            )
+            st.markdown(
+                f"<div class='mock-card mock-multiples'><div class='mock-card-title'>Trading Multiples — {escape(ticker)}</div>"
+                f"<div class='stat-grid'>{tiles}</div></div>",
+                unsafe_allow_html=True,
+            )
+        with peer_column:
+            peer_columns = ["Company", "Ticker", "Market Cap", "P/E TTM", "EV / EBITDA", "Revenue Growth", "Operating Margin", "FCF Margin"]
+            peer_head = "".join(f"<th>{escape(column)}</th>" for column in peer_columns)
+            peer_rows = ""
+            for _, row in display[peer_columns].iterrows():
+                peer_rows += "<tr>" + "".join(f"<td>{escape(str(row[column]))}</td>" for column in peer_columns) + "</tr>"
+            st.markdown(
+                f"""<div class='mock-card mock-peers'><div class='mock-card-title'>Relevant Peer Snapshot</div>
+                <div class='mock-table-wrap'><table class='mock-table'><thead><tr>{peer_head}</tr></thead><tbody>{peer_rows}</tbody></table></div>
+                <div class='mock-note'>Peers are selected from the dashboard’s 19-company research universe.<br>
+                Values are provider-reported or directly calculated; unavailable metrics are not estimated.</div></div>""",
+                unsafe_allow_html=True,
+            )
+
+    dcf_values = default_dcf_v2_snapshot(info)
+    current_price = dcf_values.get("Current") if dcf_values else (g(info, "currentPrice") or g(info, "regularMarketPrice"))
+    bear_value = dcf_values.get("Bear") if dcf_values else None
+    base_value = dcf_values.get("Base") if dcf_values else None
+    bull_value = dcf_values.get("Bull") if dcf_values else None
+    dcf_gap = base_value / current_price - 1.0 if base_value is not None and current_price else None
+    valid_values = [value for value in (bear_value, base_value, bull_value) if value is not None]
+    value_range = f"{format_price(min(valid_values))} – {format_price(max(valid_values))}" if valid_values else "Data unavailable"
+    summary_cells = [
+        ("Current Price", format_price(current_price), "neutral-value", ""),
+        ("Bear DCF Value", format_price(bear_value), "bear-value", ""),
+        ("Base DCF Value", format_price(base_value), "base-value", ""),
+        ("Bull DCF Value", format_price(bull_value), "bull-value", ""),
+        ("Valuation Range", value_range, "base-value range-value", f"Base: {format_price(base_value)}"),
+        ("Implied Upside / Downside", f"{dcf_gap:+.1%}" if dcf_gap is not None else "Data unavailable", "bull-value" if dcf_gap is not None and dcf_gap >= 0 else "bear-value", "vs. Base DCF"),
+    ]
+    summary_html = "".join(
+        f"<div class='mock-summary-cell'><div class='k'>{escape(label)}</div><div class='v {css}'>{escape(value)}</div>"
+        f"{f'<div class=\"s\">{escape(subtext)}</div>' if subtext else ''}</div>"
+        for label, value, css, subtext in summary_cells
+    )
+    framework_label = framework_for(ticker).get("framework", "Standard mature-company DCF")
+    summary_method = {
+        "Financial institution / FCFE": "Equity DCF / FCFE",
+        "Pre-profit / emerging-company DCF": "Emerging-company DCF",
+        "Special-case valuation": "Special-case valuation",
+    }.get(framework_label, "Simplified Unlevered DCF")
+    st.markdown(
+        f"<div class='mock-card mock-dcf-summary'><div class='mock-card-title'>DCF Summary — {escape(selected_company)} ({escape(summary_method)})</div>"
+        f"<div class='mock-summary-grid'>{summary_html}</div></div>",
+        unsafe_allow_html=True,
+    )
+
+    preview_companies = {name: COMPANIES[name] for name in SLEEPER_STOCKS}
+    preview, _ = get_market_data(preview_companies)
+    preview_caps = get_company_metrics(SLEEPER_STOCKS)[["Company", "Market Cap"]]
+    preview = preview.merge(preview_caps, on="Company", how="left")
+    with st.container(key="relative_preview"):
+        st.markdown("<div class='mock-card-title preview-title'>Research Universe Preview</div>", unsafe_allow_html=True)
+        with st.container(key="relative_filters"):
+            filter_category, filter_risk, filter_cap, filter_performance = st.columns([1.0, 0.95, 0.95, 2.35])
+            with filter_category:
+                category_choice = st.selectbox("Category", ["All Categories", *sorted(preview["Category"].dropna().unique())], key="relative_category")
+            with filter_risk:
+                risk_choice = st.selectbox("Risk Level", ["All Risk Levels", *sorted(preview["Risk Level"].dropna().unique())], key="relative_risk")
+            with filter_cap:
+                cap_choice = st.selectbox("Market Cap", ["All Market Caps", "≥ $10B", "< $10B"], key="relative_cap")
+            returns = pd.to_numeric(preview["1Y Return %"], errors="coerce").dropna()
+            with filter_performance:
+                if returns.empty:
+                    performance_range = None
+                    st.caption("1Y performance unavailable")
+                else:
+                    low_return, high_return = float(returns.min()), float(returns.max())
+                    performance_range = st.slider("1Y Performance (%)", low_return, high_return, (low_return, high_return), key="relative_performance")
+        filtered = preview.copy()
+        if category_choice != "All Categories":
+            filtered = filtered[filtered["Category"] == category_choice]
+        if risk_choice != "All Risk Levels":
+            filtered = filtered[filtered["Risk Level"] == risk_choice]
+        if cap_choice == "≥ $10B":
+            filtered = filtered[filtered["Market Cap"] >= 10e9]
+        elif cap_choice == "< $10B":
+            filtered = filtered[filtered["Market Cap"] < 10e9]
+        if performance_range is not None:
+            filtered = filtered[pd.to_numeric(filtered["1Y Return %"], errors="coerce").between(*performance_range)]
+        preview_rows = ""
+        for _, row in filtered.iterrows():
+            daily = row["Daily Change %"]
+            annual = row["1Y Return %"]
+            daily_class = "pos" if pd.notna(daily) and daily >= 0 else "neg" if pd.notna(daily) else "neutral"
+            annual_class = "pos" if pd.notna(annual) and annual >= 0 else "neg" if pd.notna(annual) else "neutral"
+            daily_text = f"{daily:+.2f}%" if pd.notna(daily) else "—"
+            annual_text = f"{annual:+.2f}%" if pd.notna(annual) else "—"
+            preview_rows += (
+                f"<tr><td>{escape(str(row['Company']))}</td><td>{escape(str(row['Ticker']))}</td>"
+                f"<td>{format_price(row['Current Price'])}</td><td class='{daily_class}'>{daily_text}</td>"
+                f"<td class='{annual_class}'>{annual_text}</td><td>{format_price(row['52W High'])}</td>"
+                f"<td>{format_price(row['52W Low'])}</td><td>{escape(str(row['Category']))}</td><td>{escape(str(row['Risk Level']))}</td></tr>"
+            )
+        st.markdown(
+            f"""<div class='mock-table-wrap preview-table'><table class='mock-table'><thead><tr>
+            <th>Company</th><th>Ticker</th><th>Price</th><th>1D %</th><th>1Y %</th><th>52W High</th><th>52W Low</th><th>Category</th><th>Risk</th>
+            </tr></thead><tbody>{preview_rows}</tbody></table></div>""",
+            unsafe_allow_html=True,
+        )
+        with st.container(key="relative_preview_button"):
+            button_left, button_center, button_right = st.columns([1.0, 0.42, 1.0])
+            with button_center:
+                if st.button("View Full Research Universe  →", key="open_full_universe", width="stretch"):
+                    st.session_state["active_page"] = "Research Universe"
+                    st.session_state["mobile_navigation"] = "Research Universe"
+                    for group_name, group_pages in NAV_GROUPS.items():
+                        st.session_state[nav_key(group_name)] = "Research Universe" if "Research Universe" in group_pages else None
+                    st.rerun()
 
 
 def render_risk_performance(info):
