@@ -1,7 +1,5 @@
 import logging
-from datetime import datetime
 from html import escape
-from zoneinfo import ZoneInfo
 
 import streamlit as st
 import yfinance as yf
@@ -3472,13 +3470,18 @@ with st.container(key="application_header"):
             label_visibility="collapsed",
         )
 ticker = COMPANIES[selected_company]
+header_info = get_fundamentals(ticker)
 with header_ticker:
     st.markdown(
         f"<div class='header-ticker-chip'><span class='glyph'>{'●' if ticker == 'AAPL' else '◆'}</span>{escape(ticker)}<span style='color:#8390a2'>⌄</span></div>",
         unsafe_allow_html=True,
     )
 with header_market:
-    market_stamp = datetime.now(ZoneInfo("America/Chicago")).strftime("%b %d, %Y %I:%M %p CT")
+    header_quote_time = g(header_info, "regularMarketTime")
+    if header_quote_time:
+        market_stamp = pd.to_datetime(header_quote_time, unit="s", utc=True).tz_convert("America/Chicago").strftime("%b %d, %Y %I:%M %p CT")
+    else:
+        market_stamp = "unavailable"
     st.markdown(
         f"<div class='header-market-time'>Market data as of {market_stamp}<span class='live-dot'>●</span></div>",
         unsafe_allow_html=True,
@@ -3501,7 +3504,7 @@ company_pages = {
     "Overview", "Price & Chart", "Financial Statements", "Company Analysis", "Research Notes",
     "DCF Model", "Relative Valuation", "Risk & Performance", "Peer Comparison", "Company Profile",
 }
-security_info = get_fundamentals(ticker) if page in company_pages else {}
+security_info = header_info if page in company_pages else {}
 if page in company_pages:
     security_header(security_info)
 
