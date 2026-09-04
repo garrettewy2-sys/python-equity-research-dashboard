@@ -795,6 +795,7 @@ st.markdown(
     .sidebar-author .creator-link:hover {
         color:#0b5bd3 !important; background:var(--ei-soft-blue);
     }
+    .sidebar-author .creator-link span { color:inherit !important; }
     .sidebar-author .social-icon {
         display:block; width:13px; height:13px; flex:0 0 13px; background:currentColor;
         -webkit-mask:var(--social-icon) center/contain no-repeat;
