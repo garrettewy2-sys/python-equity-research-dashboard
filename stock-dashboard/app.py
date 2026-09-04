@@ -41,7 +41,7 @@ logger = logging.getLogger(__name__)
 # PAGE SETUP
 # =============================================================
 st.set_page_config(
-    page_title="Equity Research Dashboard",
+    page_title="Equity Research Terminal",
     page_icon="📈",
     layout="wide",
     initial_sidebar_state="auto",
@@ -1656,7 +1656,7 @@ st.sidebar.markdown(
     """
     <div class="sb-brand">
         <div class="mark"><span class="brand-chart-icon"></span></div>
-        <div><div class="t">Equity Research <span class="accent">Dashboard</span></div></div>
+        <div><div class="t">Equity Research <span class="accent">Terminal</span></div></div>
     </div>
     """,
     unsafe_allow_html=True,
@@ -1743,7 +1743,7 @@ for group_name, group_pages in NAV_GROUPS.items():
 st.sidebar.markdown(
     """<div class="sidebar-author"><div class="row"><div class="icon"><span class="brand-chart-icon"></span></div>
     <div><div class="name">Built by Garrett Ewy</div>
-    <div class="role">Quantitative Equity Research</div></div></div>
+    <div class="role">Market Data · Fundamental Analysis · Valuation · Risk</div></div></div>
     <div class="version">v2.0.0</div></div>""",
     unsafe_allow_html=True,
 )
@@ -3792,7 +3792,7 @@ elif page == "About":
     page_head("About", "Project purpose and technology")
     st.markdown(
         """<div class="panel">
-        <h4>Equity Research Dashboard</h4>
+        <h4>Equity Research Terminal</h4>
         <p class="small-muted">An interactive equity-research project combining market data, financial statement analysis, valuation and quantitative research tools.</p>
         <p class="small-muted" style="margin-top:10px;">Built by <b>Garrett Ewy</b>.</p>
         <p class="small-muted" style="margin-top:10px;">Technology: Python · Streamlit · Pandas · Plotly · yfinance</p>
@@ -3804,7 +3804,7 @@ elif page == "About":
  
 st.divider()
 st.caption(
-    "Equity Research Dashboard · Built by Garrett Ewy · Market and fundamental data via Yahoo Finance. "
+    "Equity Research Terminal · Built by Garrett Ewy · Market and fundamental data via Yahoo Finance. "
     "Educational research only; not investment advice."
 )
  
